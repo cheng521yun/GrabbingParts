@@ -204,6 +204,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
             string zoomImageUrl;
             string imageUrl;
             string datasheetUrl;
+            HtmlAttribute zoomImageNode;
 
             foreach (SubCategory subCategory in supplier.Categories[categoryIndex].SubCategories)
             {
@@ -239,7 +240,17 @@ namespace GrabbingParts.BLL.ScraperLibrary
                                     partUrl = DIGIKEYHOMEURL + tr.SelectSingleNode("td[@class='mfg-partnumber']/a").Attributes["href"].Value;
                                     manufacturer = tr.SelectSingleNode("td[@class='vendor']/span//span").InnerText;
                                     description = tr.SelectSingleNode("td[@class='description']").InnerText;
-                                    zoomImageUrl = tr.SelectSingleNode("td[@class='image']/a/img").Attributes["zoomimg"].Value;
+
+                                    zoomImageNode = tr.SelectSingleNode("td[@class='image']/a/img").Attributes["zoomimg"];
+                                    if (zoomImageNode != null)
+                                    {
+                                        zoomImageUrl = zoomImageNode.Value;
+                                    }
+                                    else
+                                    {
+                                        zoomImageUrl = "";
+                                    }
+                                    
                                     imageUrl = tr.SelectSingleNode("td[@class='image']/a/img").Attributes["src"].Value;
 
                                     if (tr.SelectSingleNode("td[@class='rd-datasheet']/center/a") != null)
