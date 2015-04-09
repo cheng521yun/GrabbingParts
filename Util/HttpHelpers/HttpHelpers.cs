@@ -11,7 +11,7 @@ using System.Text;
 using System.Web;
 using System.Xml;
 using System.Xml.Linq;
-using GrabbingParts;
+using GrabbingParts.Util.XmlHelpers;
 
 namespace GrabbingParts.HttpHelpers
 {
@@ -131,7 +131,7 @@ namespace GrabbingParts.HttpHelpers
                         {
                             // load to make sure xml is valid
                             if (!string.IsNullOrEmpty(strXml))
-                                XmlHelpers.XmlHelpers.LoadXml(strXml);
+                                XmlHelpers.LoadXml(strXml);
                         }
                         catch (Exception)
                         {
@@ -142,7 +142,7 @@ namespace GrabbingParts.HttpHelpers
                         }
 
                         // dummy up a root node if nothing to return to give valid xml
-                        return XmlHelpers.XmlHelpers.AggregateXml(string.IsNullOrEmpty(strXml) ? "root" : "", strXml);
+                        return XmlHelpers.AggregateXml(string.IsNullOrEmpty(strXml) ? "root" : "", strXml);
                     }
                 }
             }
@@ -202,7 +202,7 @@ namespace GrabbingParts.HttpHelpers
                         {
                             // load to make sure xml is valid
                             if (!string.IsNullOrEmpty(strXml))
-                                XmlHelpers.XmlHelpers.LoadXml(strXml);
+                                XmlHelpers.LoadXml(strXml);
                         }
                         catch (Exception)
                         {
@@ -217,7 +217,7 @@ namespace GrabbingParts.HttpHelpers
                         }
 
                         // dummy up a root node if nothing to return to give valid xml
-                        return XmlHelpers.XmlHelpers.AggregateXml(string.IsNullOrEmpty(strXml) ? "root" : "", strXml);
+                        return XmlHelpers.AggregateXml(string.IsNullOrEmpty(strXml) ? "root" : "", strXml);
                     }
                 }
             }

@@ -4,7 +4,7 @@ using System.Text;
 using System.Globalization;
 using System.Threading;
 
-namespace GrabbingParts.XmlHelpers
+namespace GrabbingParts.Util.XmlHelpers
 {
     /// <summary>
     /// To/from xml formatting helpers.

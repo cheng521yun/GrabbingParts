@@ -2,7 +2,7 @@
 using System.Data;
 using System.Globalization;
 
-namespace Morningstar.SBT.Util.SqlHelpers
+namespace GrabbingParts.Util.SqlHelpers
 {
     public static class TableDataHelpers
     {

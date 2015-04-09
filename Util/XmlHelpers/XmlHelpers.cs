@@ -13,7 +13,7 @@ using Microsoft.Practices.EnterpriseLibrary.Caching;
 using Microsoft.Practices.EnterpriseLibrary.Caching.Expirations;
 using Mvp.Xml.Common.XPath;
 
-namespace GrabbingParts.XmlHelpers
+namespace GrabbingParts.Util.XmlHelpers
 {
     /// <summary>
     /// Xml helper functions

@@ -1,10 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
+using System.Data.SqlTypes;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using System.Xml.Linq;
+using System.Xml.XPath;
 using GrabbingParts.BLL.Types;
+using GrabbingParts.DAL.DataAccessCenter;
 using GrabbingParts.Util.StringHelpers;
+using GrabbingParts.Util.XmlHelpers;
 using HtmlAgilityPack;
 
 [assembly: log4net.Config.XmlConfigurator(Watch = true)]
@@ -19,6 +24,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private Supplier supplier = new Supplier();
         private XElement scrapedData = XElement.Parse(string.Format("<r name=\"{0}\" url=\"{1}\"><cats/></r>", SUPPLIERNAME, DIGIKEYHOMEURL));
         private int partCount;
+        private List<DataTable> categoryDataTables = new List<DataTable>();
 
         public static HtmlDocument baseHtmlDoc = new HtmlDocument();
 
@@ -61,6 +67,12 @@ namespace GrabbingParts.BLL.ScraperLibrary
             log.DebugFormat("PrepareScrapedData finish.cost:{0}ms", sw.ElapsedMilliseconds);
 
             log.DebugFormat("Part count:{0}", partCount);
+
+            InitCategoryDataTables();
+
+            PrepareCategoryDataTables();
+
+            InsertDataToDatabase();
         }
 
         private void GetBaseHtmlDocument()
@@ -381,6 +393,42 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     }
                 }
             }
+        }
+
+        /// <summary>
+        /// Init category data tables
+        /// </summary>
+        private void InitCategoryDataTables()
+        {
+            for (int i = 0; i < 4; i++)
+            {
+                DataTable dt = new DataTable();
+                dt = new DataTable();
+                dt.Columns.Add("GUID", typeof(System.Data.SqlTypes.SqlGuid));
+                dt.Columns.Add("Name", typeof(string));
+                dt.Columns.Add("ParentID", typeof(string));
+                dt.Columns.Add("Comment", typeof(string));
+                categoryDataTables.Add(dt);
+            }
+        }
+
+        private void PrepareCategoryDataTables()
+        {
+            foreach (XElement category in scrapedData.XPathSelectElements("cats/cat"))
+            {
+                DataRow dr = categoryDataTables[0].NewRow();
+                dr["GUID"] = (SqlGuid)System.Guid.NewGuid();
+                dr["Name"] = XmlHelpers.GetAttribute(category, "n");
+                dr["ParentID"] = "";
+                dr["Comment"] = "";
+                categoryDataTables[0].Rows.Add(dr);
+            }
+        }
+
+        private void InsertDataToDatabase()
+        {
+            //Inert data to [产品分类]
+            DataCenter.InsertDataToDatabase(categoryDataTables[0]);
         }
     }
 }

@@ -48,9 +48,17 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\DAL\DataAccessCenter\DataAccessCenter.csproj">
+      <Project>{4beb47f0-a9b2-4105-b48b-c2e29976db40}</Project>
+      <Name>DataAccessCenter</Name>
+    </ProjectReference>
     <ProjectReference Include="..\..\Util\StringHelpers\StringHelpers.csproj">
       <Project>{06738e4d-350a-4d2b-8c66-01d48bd5a910}</Project>
       <Name>StringHelpers</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\..\Util\XmlHelpers\XmlHelpers.csproj">
+      <Project>{4f7ddbb0-95d8-40a0-86eb-87d740a42840}</Project>
+      <Name>XmlHelpers</Name>
     </ProjectReference>
     <ProjectReference Include="..\Common\Common.csproj">
       <Project>{5e5c4fb6-d2cd-40be-b78f-4d2416df0f6d}</Project>

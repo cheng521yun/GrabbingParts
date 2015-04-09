@@ -14,9 +14,9 @@ using Microsoft.Practices.EnterpriseLibrary.Data;
 using Microsoft.Practices.EnterpriseLibrary.Data.Configuration;
 using Microsoft.Practices.EnterpriseLibrary.Data.Sql;
 using System.Xml.Linq;
+using GrabbingParts.Util.XmlHelpers;
 
-
-namespace GrabbingParts.SqlHelpers
+namespace GrabbingParts.Util.SqlHelpers
 {
     public static class SqlHelpers
     {
