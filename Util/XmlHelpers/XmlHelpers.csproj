@@ -7,8 +7,8 @@
     <ProjectGuid>{4F7DDBB0-95D8-40A0-86EB-87D740A42840}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>GrabbingParts.XmlHelpers</RootNamespace>
-    <AssemblyName>GrabbingParts.XmlHelpers</AssemblyName>
+    <RootNamespace>GrabbingParts.Util.XmlHelpers</RootNamespace>
+    <AssemblyName>GrabbingParts.Util.XmlHelpers</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>

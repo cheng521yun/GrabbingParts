@@ -30,9 +30,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="HtmlAgilityPack">
-      <HintPath>..\..\ThirdPartyBin\HtmlAgilityPack.dll</HintPath>
-    </Reference>
     <Reference Include="log4net">
       <HintPath>..\..\ThirdPartyBin\log4net.dll</HintPath>
     </Reference>
@@ -54,6 +51,14 @@
     <ProjectReference Include="..\..\Util\StringHelpers\StringHelpers.csproj">
       <Project>{06738e4d-350a-4d2b-8c66-01d48bd5a910}</Project>
       <Name>StringHelpers</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\Common\Common.csproj">
+      <Project>{5e5c4fb6-d2cd-40be-b78f-4d2416df0f6d}</Project>
+      <Name>Common</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\HtmlAgilityPack\HtmlAgilityPack.csproj">
+      <Project>{193bb801-054f-4729-9d5d-fce1e32594bf}</Project>
+      <Name>HtmlAgilityPack</Name>
     </ProjectReference>
     <ProjectReference Include="..\Types\Types.csproj">
       <Project>{762727e9-e8e6-4839-827d-6972bd704418}</Project>

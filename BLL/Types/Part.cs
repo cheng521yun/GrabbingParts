@@ -8,16 +8,24 @@ namespace GrabbingParts.BLL.Types
 {
     public class Part
     {
-        public string Id { get; set; }
-        public string Manufacturer { get; set; }
+        public string Id { get; set; } //制造商零件编号
+        public string Manufacturer { get; set; } //制造商
         public string Url { get; set; }
-        public string Description { get; set; }
+        public string Description { get; set; } //描述
         public string ZoomImageUrl { get; set; }
         public string ImageUrl { get; set; }
         public string DatasheetUrl { get; set; }
+        public string Packing { get; set; } //包装 (标准包装)
+
+        private List<ProductSpecification> productSpecifications = new List<ProductSpecification>();
+        public List<ProductSpecification> ProductSpecifications
+        {
+            get { return this.productSpecifications; }
+            set { this.productSpecifications = value; }
+        }
 
         public Part(string id, string manufacturer, string url, string description, string zoomImageUrl,
-            string imageUrl, string datasheetUrl)
+            string imageUrl, string datasheetUrl, string packing)
         {
             this.Id = id;
             this.Manufacturer = manufacturer;
@@ -26,6 +34,7 @@ namespace GrabbingParts.BLL.Types
             this.ZoomImageUrl = zoomImageUrl;
             this.ImageUrl = imageUrl;
             this.DatasheetUrl = datasheetUrl;
+            this.Packing = packing;
         }
     }
 }

@@ -4,7 +4,7 @@ namespace GrabbingParts.Util.StringHelpers
 {
     public static class StringHelpers
     {
-        public static string GetLastDirectory(string Char, string String)
+        public static string GetLastDirectory(string String, string Char = "/")
         {
             return String.Substring(String.LastIndexOf(Char) + 1);
         }

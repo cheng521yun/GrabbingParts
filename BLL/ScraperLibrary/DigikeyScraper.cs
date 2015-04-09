@@ -1,57 +1,70 @@
-﻿using HtmlAgilityPack;
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading.Tasks;
+using System.Xml.Linq;
 using GrabbingParts.BLL.Types;
 using GrabbingParts.Util.StringHelpers;
-using System.Diagnostics;
+using HtmlAgilityPack;
 
 [assembly: log4net.Config.XmlConfigurator(Watch = true)]
 namespace GrabbingParts.BLL.ScraperLibrary
 {
     public class DigikeyScraper : Scraper
     {
+        private const string SUPPLIERNAME = "digikey";
         private const string DIGIKEYHOMEURL = "http://www.digikey.cn";
+        private const string BAOZHUANG = "包装";
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         private Supplier supplier = new Supplier();
+        private XElement scrapedData = XElement.Parse(string.Format("<r name=\"{0}\" url=\"{1}\"><cats/></r>", SUPPLIERNAME, DIGIKEYHOMEURL));
+        private int partCount;
 
         public static HtmlDocument baseHtmlDoc = new HtmlDocument();
 
         static Dictionary<string, Dictionary<string, string>> categoryListDict = new Dictionary<string, Dictionary<string, string>>();
         static Dictionary<string, IEnumerable<string>> categoryIndexListDict = new Dictionary<string, IEnumerable<string>>();
-        static Dictionary<string, string> failDetailedLinks = new Dictionary<string, string>();        
+        static Dictionary<string, string> failDetailedLinks = new Dictionary<string, string>();
 
         public override void ScrapePage()
         {
             Stopwatch sw = Stopwatch.StartNew();
-            log.Debug("Before the method GetBaseHtmlDocument.................................................................");
+            log.Debug("Before the method GetBaseHtmlDocument.");
 
             GetBaseHtmlDocument();
 
             sw.Stop();
-            log.DebugFormat("GetBaseHtmlDocument finish.cost:{0}ms.................................................................", sw.ElapsedMilliseconds);
+            log.DebugFormat("GetBaseHtmlDocument finish.cost:{0}ms", sw.ElapsedMilliseconds);
 
-            sw = Stopwatch.StartNew();            
+            sw = Stopwatch.StartNew();
             GetCategory();
 
             sw.Stop();
-            log.DebugFormat("GetCategory finish.cost:{0}ms.................................................................", sw.ElapsedMilliseconds);
+            log.DebugFormat("GetCategory finish.cost:{0}ms", sw.ElapsedMilliseconds);
 
             sw = Stopwatch.StartNew();
             GetSubCategoryAndWidget();
 
             sw.Stop();
-            log.DebugFormat("GetSubCategoryAndWidget finish.cost:{0}ms.................................................................", sw.ElapsedMilliseconds);
+            log.DebugFormat("GetSubCategoryAndWidget finish.cost:{0}ms", sw.ElapsedMilliseconds);
 
             sw = Stopwatch.StartNew();
             GetPartGroup();
 
             sw.Stop();
-            log.DebugFormat("GetPartGroup finish.cost:{0}ms.................................................................", sw.ElapsedMilliseconds);
+            log.DebugFormat("GetPartGroup finish.cost:{0}ms", sw.ElapsedMilliseconds);
+
+            sw = Stopwatch.StartNew();
+            PrepareScrapedData();
+
+            sw.Stop();
+            log.DebugFormat("PrepareScrapedData finish.cost:{0}ms", sw.ElapsedMilliseconds);
+
+            log.DebugFormat("Part count:{0}", partCount);
         }
 
         private void GetBaseHtmlDocument()
-        {            
+        {
             //string textHome = HttpHelpers.HttpHelpers.GetText(homeUrl, 10000);          
             //string url = "http://www.digikey.com.cn/search/zh?c=406&f=408&f=409&f=410&f=411&f=412&f=413&f=414";
             //string text = HttpHelpers.HttpHelpers.GetText(url,10000);
@@ -70,7 +83,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
             int key = 1;
             string categoryName = "";
 
-            foreach(HtmlNode uiCategory in uiCategoryList)
+            foreach (HtmlNode uiCategory in uiCategoryList)
             {
                 categoryName = uiCategory.InnerText;
                 supplier.Categories.Add(new Category(key.ToString(), categoryName));
@@ -96,7 +109,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
             foreach (HtmlNode uiSubCategory in uiSubCategoryList)
             {
                 HtmlNodeCollection uiAnchorList = uiSubCategory.SelectNodes("a[@id!='viewall-link']");
-                foreach(HtmlNode uiAnchor in uiAnchorList)
+                foreach (HtmlNode uiAnchor in uiAnchorList)
                 {
                     subCategoryId = uiAnchor.Attributes["id"].Value;
                     subCategoryName = uiAnchor.InnerText;
@@ -105,7 +118,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     HtmlNodeCollection liList = ul.SelectNodes("li");
                     widgetId = 1;
 
-                    foreach(HtmlNode li in liList)
+                    foreach (HtmlNode li in liList)
                     {
                         anchorNode = li.SelectSingleNode("a");
                         widgetName = anchorNode.InnerText;
@@ -194,6 +207,8 @@ namespace GrabbingParts.BLL.ScraperLibrary
             HtmlWeb htmlWeb = new HtmlWeb();
             string partGroupXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/ul[@id='productIndexList']/li[@class='catfilteritem']/ul[@class='catfiltersub']/li";
             string partXpath = "//table[@id='productTable']//tbody/tr";
+            string partDetailXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/table[@class='product-additional-info']/tr/td[@class='attributes-table-main']/table/tr[5]/td";
+            string productSpecXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/table[@class='product-additional-info']/tr/td[@class='attributes-table-main']/table/tr";
             string partGroupName;
             string partGroupUrl;
             HtmlNode anchorNode;
@@ -205,12 +220,15 @@ namespace GrabbingParts.BLL.ScraperLibrary
             string imageUrl;
             string datasheetUrl;
             HtmlAttribute zoomImageNode;
+            string packing;
+            string productSpecName;
+            string productSpecContent;
 
             foreach (SubCategory subCategory in supplier.Categories[categoryIndex].SubCategories)
             {
                 foreach (Widget widget in subCategory.Widgets)
                 {
-                    bool noPartGroup = StringHelpers.IsInteger(StringHelpers.GetLastDirectory("/", widget.Url));
+                    bool noPartGroup = StringHelpers.IsInteger(StringHelpers.GetLastDirectory(widget.Url));
                     if (noPartGroup)
                     {
                         widget.PartGroups.Add(new PartGroup("1", "PartGroup", widget.Url));
@@ -226,7 +244,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                             anchorNode = li.SelectSingleNode("a");
                             partGroupName = anchorNode.InnerText;
                             partGroupUrl = DIGIKEYHOMEURL + anchorNode.Attributes["href"].Value;
-                            
+
                             PartGroup partGroup = new PartGroup(partGroupId.ToString(), partGroupName, partGroupUrl);
                             HtmlDocument partGroupHtmlDoc = htmlWeb.Load(partGroupUrl);
 
@@ -250,7 +268,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                                     {
                                         zoomImageUrl = "";
                                     }
-                                    
+
                                     imageUrl = tr.SelectSingleNode("td[@class='image']/a/img").Attributes["src"].Value;
 
                                     if (tr.SelectSingleNode("td[@class='rd-datasheet']/center/a") != null)
@@ -262,8 +280,40 @@ namespace GrabbingParts.BLL.ScraperLibrary
                                         datasheetUrl = "";
                                     }
 
-                                    partGroup.Parts.Add(new Part(partId, manufacturer, partUrl, description, zoomImageUrl,
-                                        imageUrl, datasheetUrl));
+                                    HtmlDocument partHtmlDoc = Common.Common.RetryRequest(partUrl);
+                                    HtmlNodeCollection productSpecList = null;
+
+                                    if (partHtmlDoc != null)
+                                    {
+                                        HtmlNode packingNode = partHtmlDoc.DocumentNode.SelectSingleNode(partDetailXpath);
+                                        packing = packingNode.InnerText;
+                                        productSpecList = partHtmlDoc.DocumentNode.SelectNodes(productSpecXpath);
+                                    }
+                                    else
+                                    {
+                                        packing = "";
+                                    }
+
+                                    Part part = new Part(partId, manufacturer, partUrl, description, zoomImageUrl,
+                                        imageUrl, datasheetUrl, packing);
+
+                                    if (productSpecList != null)
+                                    {
+                                        foreach (HtmlNode node in productSpecList)
+                                        {
+                                            productSpecName = node.SelectSingleNode("th").InnerText;
+                                            productSpecContent = node.SelectSingleNode("td").InnerText;
+
+                                            if (!productSpecName.Contains(BAOZHUANG))
+                                            {
+                                                part.ProductSpecifications.Add(new ProductSpecification(productSpecName, productSpecContent));
+                                            }
+                                        }
+                                    }
+
+                                    //Todo: add price information to part after 2015-04-10
+
+                                    partGroup.Parts.Add(part);
                                 }
                             }
                             else
@@ -273,6 +323,60 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
                             widget.PartGroups.Add(partGroup);
                             partGroupId++;
+                        }
+                    }
+                }
+            }
+        }
+
+        /// <summary>
+        /// Prepare scraped data
+        /// </summary>
+        private void PrepareScrapedData()
+        {
+            foreach (Category category in supplier.Categories)
+            {
+                XElement xeCategory = new XElement("cat", new XAttribute("id", category.Id),
+                                                                    new XAttribute("n", category.Name.TrimStart()),
+                                                                    new XElement("subcats"));
+                scrapedData.Element("cats").Add(xeCategory);
+
+                foreach (SubCategory subCategory in category.SubCategories)
+                {
+                    XElement xeSubCategory = new XElement("subcat", new XAttribute("id", subCategory.Id),
+                                                                    new XAttribute("n", subCategory.Name.TrimStart()),
+                                                                    new XElement("wgts"));
+                    xeCategory.Element("subcats").Add(xeSubCategory);
+
+                    foreach (Widget widget in subCategory.Widgets)
+                    {
+                        XElement xeWidget = new XElement("wgt", new XAttribute("id", widget.Id),
+                                                                new XAttribute("n", widget.Name),
+                                                                new XElement("pgs"));
+                        xeSubCategory.Element("wgts").Add(xeWidget);
+
+                        foreach (PartGroup partGroup in widget.PartGroups)
+                        {
+                            XElement xePartGroup = new XElement("pg", new XAttribute("id", partGroup.Id),
+                                                                      new XAttribute("n", partGroup.Name),
+                                                                      new XElement("ps"));
+                            xeWidget.Element("pgs").Add(xePartGroup);
+
+                            foreach (Part part in partGroup.Parts)
+                            {
+                                XElement xePart = new XElement("p", new XAttribute("id", part.Id),
+                                                                    new XAttribute("mft", part.Manufacturer),
+                                                                    new XAttribute("url", part.Url),
+                                                                    new XAttribute("des", part.Description),
+                                                                    new XAttribute("zoo", StringHelpers.GetLastDirectory(part.ZoomImageUrl)),
+                                                                    new XAttribute("img", StringHelpers.GetLastDirectory(part.ImageUrl)),
+                                                                    new XAttribute("ds", StringHelpers.GetLastDirectory(part.DatasheetUrl)),
+                                                                    new XAttribute("pack", part.Packing.TrimStart().TrimEnd()));
+
+                                //Todo: add price information to part after 2015-04-10
+                                xePartGroup.Element("ps").Add(xePart);
+                                partCount++;
+                            }
                         }
                     }
                 }

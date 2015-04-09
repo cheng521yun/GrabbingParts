@@ -7,8 +7,8 @@
     <ProjectGuid>{37C83CDB-A84E-4A71-A964-DE84A6060938}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>GrabbingParts.FtpHelpers</RootNamespace>
-    <AssemblyName>GrabbingParts.FtpHelpers</AssemblyName>
+    <RootNamespace>GrabbingParts.Util.FtpHelpers</RootNamespace>
+    <AssemblyName>GrabbingParts.Util.FtpHelpers</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>

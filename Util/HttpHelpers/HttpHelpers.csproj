@@ -7,8 +7,8 @@
     <ProjectGuid>{8342543D-6F54-4526-ABEE-89A7D3898BB3}</ProjectGuid>
     <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>GrabbingParts.HttpHelpers</RootNamespace>
-    <AssemblyName>GrabbingParts.HttpHelpers</AssemblyName>
+    <RootNamespace>GrabbingParts.Util.HttpHelpers</RootNamespace>
+    <AssemblyName>GrabbingParts.Util.HttpHelpers</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
