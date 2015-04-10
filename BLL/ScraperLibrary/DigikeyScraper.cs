@@ -20,11 +20,13 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private const string SUPPLIERNAME = "digikey";
         private const string DIGIKEYHOMEURL = "http://www.digikey.cn";
         private const string BAOZHUANG = "包装";
+        private const string XIANGGUANCHANPIN = "相关产品";
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         private Supplier supplier = new Supplier();
         private XElement scrapedData = XElement.Parse(string.Format("<r name=\"{0}\" url=\"{1}\"><cats/></r>", SUPPLIERNAME, DIGIKEYHOMEURL));
         private int partCount;
         private List<DataTable> categoryDataTables = new List<DataTable>();
+        private DataTable productSpecDataTable = new DataTable();
 
         public static HtmlDocument baseHtmlDoc = new HtmlDocument();
 
@@ -150,15 +152,13 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private void GetPartGroup()
         {
             Task getPartGroupForSemiconductorProducts = Task.Factory.StartNew(() => { GetPartGroupForSemiconductorProducts(); });
-            //Task getPartGroupForPassiveComponents = Task.Factory.StartNew(() => { GetPartGroupForPassiveComponents(); });
-            //Task getPartGroupForInterconnectProducts = Task.Factory.StartNew(() => { GetPartGroupForInterconnectProducts(); });
-            //Task getPartGroupForMechanicalElectronicProducts = Task.Factory.StartNew(() => { GetPartGroupForMechanicalElectronicProducts(); });
-            //Task getPartGroupForPhotoelectricElement = Task.Factory.StartNew(() => { GetPartGroupForPhotoelectricElement(); });
+            Task getPartGroupForPassiveComponents = Task.Factory.StartNew(() => { GetPartGroupForPassiveComponents(); });
+            Task getPartGroupForInterconnectProducts = Task.Factory.StartNew(() => { GetPartGroupForInterconnectProducts(); });
+            Task getPartGroupForMechanicalElectronicProducts = Task.Factory.StartNew(() => { GetPartGroupForMechanicalElectronicProducts(); });
+            Task getPartGroupForPhotoelectricElement = Task.Factory.StartNew(() => { GetPartGroupForPhotoelectricElement(); });
 
-            //Task[] taskList = { getPartGroupForSemiconductorProducts, getPartGroupForPassiveComponents, getPartGroupForInterconnectProducts,
-            //                    getPartGroupForMechanicalElectronicProducts, getPartGroupForPhotoelectricElement};
-
-            Task[] taskList = { getPartGroupForSemiconductorProducts };
+            Task[] taskList = { getPartGroupForSemiconductorProducts, getPartGroupForPassiveComponents, getPartGroupForInterconnectProducts,
+                                getPartGroupForMechanicalElectronicProducts, getPartGroupForPhotoelectricElement};
 
             try
             {
@@ -318,6 +318,10 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
                                             if (!productSpecName.Contains(BAOZHUANG))
                                             {
+                                                if (productSpecName == XIANGGUANCHANPIN)
+                                                {
+                                                    productSpecContent = productSpecContent.Substring(0, 64);
+                                                }
                                                 part.ProductSpecifications.Add(new ProductSpecification(productSpecName, productSpecContent));
                                             }
                                         }
@@ -387,6 +391,12 @@ namespace GrabbingParts.BLL.ScraperLibrary
                                                                     new XAttribute("img", StringHelpers.GetLastDirectory(part.ImageUrl)),
                                                                     new XAttribute("ds", StringHelpers.GetLastDirectory(part.DatasheetUrl)),
                                                                     new XAttribute("pack", part.Packing.TrimStart().TrimEnd()));
+                                
+                                foreach(ProductSpecification ps in part.ProductSpecifications)
+                                {
+                                    xePart.Add(new XElement("s", new XAttribute("n", ps.Name),
+                                                                 new XAttribute("v", ps.Content)));
+                                }
 
                                 //Todo: add price information to part after 2015-04-10
                                 xePartGroup.Element("ps").Add(xePart);
@@ -413,6 +423,11 @@ namespace GrabbingParts.BLL.ScraperLibrary
                 dt.Columns.Add("Comment", typeof(string));
                 categoryDataTables.Add(dt);
             }
+
+            productSpecDataTable.Columns.Add("GUID", typeof(System.Data.SqlTypes.SqlGuid));
+            productSpecDataTable.Columns.Add("PN", typeof(string));
+            productSpecDataTable.Columns.Add("Name", typeof(string));
+            productSpecDataTable.Columns.Add("Content", typeof(string));
         }
 
         private void PrepareCategoryDataTables()
@@ -420,7 +435,8 @@ namespace GrabbingParts.BLL.ScraperLibrary
             SqlGuid guid0;
             SqlGuid guid1;
             SqlGuid guid2;
-            SqlGuid guid3;
+            SqlGuid guid3;            
+
             foreach (XElement category in scrapedData.XPathSelectElements("cats/cat"))
             {
                 guid0 = (SqlGuid)System.Guid.NewGuid();
@@ -431,15 +447,28 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     guid1 = (SqlGuid)System.Guid.NewGuid();
                     AddRow(categoryDataTables[1], subCategory, guid1, guid0.ToString());
 
-                    foreach(XElement widget in category.XPathSelectElements("wgts/wgt"))
+                    foreach (XElement widget in subCategory.XPathSelectElements("wgts/wgt"))
                     {
                         guid2 = (SqlGuid)System.Guid.NewGuid();
                         AddRow(categoryDataTables[2], widget, guid2, guid1.ToString());
 
-                        foreach(XElement partGroup in category.XPathSelectElements("pgs/pg"))
+                        foreach (XElement partGroup in widget.XPathSelectElements("pgs/pg"))
                         {
                             guid3 = (SqlGuid)System.Guid.NewGuid();
                             AddRow(categoryDataTables[3], partGroup, guid3, guid2.ToString());
+
+                            foreach(XElement part in partGroup.XPathSelectElements("ps/p"))
+                            {
+                                foreach(XElement spec in part.Elements("s"))
+                                {
+                                    DataRow dr = productSpecDataTable.NewRow();
+                                    dr["GUID"] = (SqlGuid)System.Guid.NewGuid();
+                                    dr["PN"] = XmlHelpers.GetAttribute(part, "id");
+                                    dr["Name"] = XmlHelpers.GetAttribute(spec, "n");
+                                    dr["Content"] = XmlHelpers.GetAttribute(spec, "v");
+                                    productSpecDataTable.Rows.Add(dr);
+                                }                                
+                            }
                         }
                     }
                 }
@@ -461,7 +490,9 @@ namespace GrabbingParts.BLL.ScraperLibrary
             for (int i = 0; i < 4; i++)
             {
                 DataCenter.InsertDataToDatabase(categoryDataTables[i]);
-            }            
+            }
+
+            DataCenter.InsertDataToProductSpecTable(productSpecDataTable);
         }
     }
 }
