@@ -27,6 +27,10 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private int partCount;
         private List<DataTable> categoryDataTables = new List<DataTable>();
         private DataTable productSpecDataTable = new DataTable();
+        private DataTable supplierDataTable = new DataTable(); 
+        private DataTable manufacturerDataTable = new DataTable();
+        private Dictionary<string, SqlGuid> manufacturerDictionary = new Dictionary<string, SqlGuid>();
+        private DataTable productInfoDataTable = new DataTable();
 
         public static HtmlDocument baseHtmlDoc = new HtmlDocument();
 
@@ -152,13 +156,15 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private void GetPartGroup()
         {
             Task getPartGroupForSemiconductorProducts = Task.Factory.StartNew(() => { GetPartGroupForSemiconductorProducts(); });
-            Task getPartGroupForPassiveComponents = Task.Factory.StartNew(() => { GetPartGroupForPassiveComponents(); });
-            Task getPartGroupForInterconnectProducts = Task.Factory.StartNew(() => { GetPartGroupForInterconnectProducts(); });
-            Task getPartGroupForMechanicalElectronicProducts = Task.Factory.StartNew(() => { GetPartGroupForMechanicalElectronicProducts(); });
-            Task getPartGroupForPhotoelectricElement = Task.Factory.StartNew(() => { GetPartGroupForPhotoelectricElement(); });
+            //Task getPartGroupForPassiveComponents = Task.Factory.StartNew(() => { GetPartGroupForPassiveComponents(); });
+            //Task getPartGroupForInterconnectProducts = Task.Factory.StartNew(() => { GetPartGroupForInterconnectProducts(); });
+            //Task getPartGroupForMechanicalElectronicProducts = Task.Factory.StartNew(() => { GetPartGroupForMechanicalElectronicProducts(); });
+            //Task getPartGroupForPhotoelectricElement = Task.Factory.StartNew(() => { GetPartGroupForPhotoelectricElement(); });
 
-            Task[] taskList = { getPartGroupForSemiconductorProducts, getPartGroupForPassiveComponents, getPartGroupForInterconnectProducts,
-                                getPartGroupForMechanicalElectronicProducts, getPartGroupForPhotoelectricElement};
+            //Task[] taskList = { getPartGroupForSemiconductorProducts, getPartGroupForPassiveComponents, getPartGroupForInterconnectProducts,
+            //                    getPartGroupForMechanicalElectronicProducts, getPartGroupForPhotoelectricElement};
+
+            Task[] taskList = { getPartGroupForSemiconductorProducts};
 
             try
             {
@@ -330,7 +336,6 @@ namespace GrabbingParts.BLL.ScraperLibrary
                                     //Todo: add price information to part after 2015-04-10
 
                                     partGroup.Parts.Add(part);
-                                    break;
                                 }
                             }
                             else
@@ -428,6 +433,26 @@ namespace GrabbingParts.BLL.ScraperLibrary
             productSpecDataTable.Columns.Add("PN", typeof(string));
             productSpecDataTable.Columns.Add("Name", typeof(string));
             productSpecDataTable.Columns.Add("Content", typeof(string));
+
+            supplierDataTable.Columns.Add("GUID", typeof(System.Data.SqlTypes.SqlGuid));
+            supplierDataTable.Columns.Add("Supplier", typeof(string));
+            supplierDataTable.Columns.Add("WebUrl", typeof(string));
+
+            manufacturerDataTable.Columns.Add("GUID", typeof(System.Data.SqlTypes.SqlGuid));
+            manufacturerDataTable.Columns.Add("Manufacturer", typeof(string));
+
+            productInfoDataTable.Columns.Add("GUID", typeof(System.Data.SqlTypes.SqlGuid));
+            productInfoDataTable.Columns.Add("PN", typeof(string));
+            productInfoDataTable.Columns.Add("Manufacturer", typeof(string));
+            productInfoDataTable.Columns.Add("ManufacturerID", typeof(System.Data.SqlTypes.SqlGuid));
+            productInfoDataTable.Columns.Add("Description", typeof(string));
+            productInfoDataTable.Columns.Add("Packing", typeof(string));
+            productInfoDataTable.Columns.Add("Type1", typeof(string));
+            productInfoDataTable.Columns.Add("Type2", typeof(string));
+            productInfoDataTable.Columns.Add("Type3", typeof(string));
+            productInfoDataTable.Columns.Add("Type4", typeof(string));
+            productInfoDataTable.Columns.Add("Datasheets", typeof(string));
+            productInfoDataTable.Columns.Add("Image", typeof(string));
         }
 
         private void PrepareCategoryDataTables()
@@ -435,7 +460,9 @@ namespace GrabbingParts.BLL.ScraperLibrary
             SqlGuid guid0;
             SqlGuid guid1;
             SqlGuid guid2;
-            SqlGuid guid3;            
+            SqlGuid guid3;
+            string manufacturer;
+            SqlGuid manufacturerGuid;
 
             foreach (XElement category in scrapedData.XPathSelectElements("cats/cat"))
             {
@@ -459,6 +486,40 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
                             foreach(XElement part in partGroup.XPathSelectElements("ps/p"))
                             {
+                                manufacturer = XmlHelpers.GetAttribute(part, "mft");
+                                DataRow drProductInfo = productInfoDataTable.NewRow();
+                                drProductInfo["GUID"] = (SqlGuid)System.Guid.NewGuid();
+                                drProductInfo["PN"] = XmlHelpers.GetAttribute(part, "id");
+                                drProductInfo["Manufacturer"] = manufacturer;
+                                
+                                if(!manufacturerDictionary.ContainsKey(manufacturer))
+                                {
+                                    manufacturerGuid = (SqlGuid)System.Guid.NewGuid();
+                                    manufacturerDictionary.Add(manufacturer, manufacturerGuid);
+
+                                    DataRow drManufacturer = manufacturerDataTable.NewRow();
+                                    drManufacturer["GUID"] = manufacturerGuid;
+                                    drManufacturer["Manufacturer"] = manufacturer;
+                                    manufacturerDataTable.Rows.Add(drManufacturer);
+                                    
+                                    drProductInfo["ManufacturerID"] = manufacturerGuid;
+                                }
+                                else
+                                {
+                                    drProductInfo["ManufacturerID"] = manufacturerDictionary[manufacturer];
+                                }
+
+                                drProductInfo["Description"] = XmlHelpers.GetAttribute(part, "des");
+                                drProductInfo["Packing"] = XmlHelpers.GetAttribute(part, "pack");
+                                drProductInfo["Packing"] = XmlHelpers.GetAttribute(part, "pack");
+                                drProductInfo["Type1"] = guid0.ToString().ToUpper();
+                                drProductInfo["Type2"] = guid1.ToString().ToUpper();
+                                drProductInfo["Type3"] = guid2.ToString().ToUpper();
+                                drProductInfo["Type4"] = guid3.ToString().ToUpper();
+                                drProductInfo["Datasheets"] = XmlHelpers.GetAttribute(part, "ds");
+                                drProductInfo["Image"] = XmlHelpers.GetAttribute(part, "img");
+                                productInfoDataTable.Rows.Add(drProductInfo);
+
                                 foreach(XElement spec in part.Elements("s"))
                                 {
                                     DataRow dr = productSpecDataTable.NewRow();
@@ -473,6 +534,12 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     }
                 }
             }
+
+            DataRow drSupplier = supplierDataTable.NewRow();
+            drSupplier["GUID"] = (SqlGuid)System.Guid.NewGuid();
+            drSupplier["Supplier"] = SUPPLIERNAME;
+            drSupplier["WebUrl"] = DIGIKEYHOMEURL;
+            supplierDataTable.Rows.Add(drSupplier);
         }
 
         private void AddRow(DataTable dt, XElement type, SqlGuid currentGuid, string parentId)
@@ -493,6 +560,9 @@ namespace GrabbingParts.BLL.ScraperLibrary
             }
 
             DataCenter.InsertDataToProductSpecTable(productSpecDataTable);
+            DataCenter.InsertDataToSupplier(supplierDataTable);
+            DataCenter.InsertDataToManufacturer(manufacturerDataTable);
+            DataCenter.InsertDataToProductInfo(productInfoDataTable);
         }
     }
 }
