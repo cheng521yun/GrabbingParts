@@ -28,9 +28,9 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
         public static HtmlDocument baseHtmlDoc = new HtmlDocument();
 
-        static Dictionary<string, Dictionary<string, string>> categoryListDict = new Dictionary<string, Dictionary<string, string>>();
-        static Dictionary<string, IEnumerable<string>> categoryIndexListDict = new Dictionary<string, IEnumerable<string>>();
-        static Dictionary<string, string> failDetailedLinks = new Dictionary<string, string>();
+        //static Dictionary<string, Dictionary<string, string>> categoryListDict = new Dictionary<string, Dictionary<string, string>>();
+        //static Dictionary<string, IEnumerable<string>> categoryIndexListDict = new Dictionary<string, IEnumerable<string>>();
+        //static Dictionary<string, string> failDetailedLinks = new Dictionary<string, string>();
 
         public override void ScrapePage()
         {
