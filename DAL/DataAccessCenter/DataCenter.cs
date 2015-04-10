@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Configuration;
 using System.Data;
 using System.Data.SqlClient;
 using System.Diagnostics;
@@ -12,7 +13,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
 
         public static void InsertDataToDatabase(DataTable dt)
         {
-            string conStr = GetConnectionString();
+            string conStr = ConfigurationManager.ConnectionStrings["WXH"].ToString();
             SqlConnection connection = new SqlConnection(conStr);
 
             try
@@ -40,15 +41,6 @@ namespace GrabbingParts.DAL.DataAccessCenter
             {
                 throw new Exception(ex.Message);
             }
-        }
-
-        private static string GetConnectionString()
-        // To avoid storing the sourceConnection string in your code, 
-        // you can retrieve it from a configuration file. 
-        {
-            return "Data Source=(local); " +
-                " Integrated Security=true;" +
-                "Initial Catalog=Test;";
         }
     }
 }

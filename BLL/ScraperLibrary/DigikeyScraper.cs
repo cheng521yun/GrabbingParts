@@ -65,7 +65,6 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
             sw.Stop();
             log.DebugFormat("PrepareScrapedData finish.cost:{0}ms", sw.ElapsedMilliseconds);
-
             log.DebugFormat("Part count:{0}", partCount);
 
             InitCategoryDataTables();
@@ -81,8 +80,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
             //string url = "http://www.digikey.com.cn/search/zh?c=406&f=408&f=409&f=410&f=411&f=412&f=413&f=414";
             //string text = HttpHelpers.HttpHelpers.GetText(url,10000);
 
-            HtmlWeb htmlWeb = new HtmlWeb();
-            baseHtmlDoc = htmlWeb.Load(DIGIKEYHOMEURL);
+            baseHtmlDoc = Common.Common.RetryRequest(DIGIKEYHOMEURL);
         }
 
         /// <summary>
@@ -152,13 +150,15 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private void GetPartGroup()
         {
             Task getPartGroupForSemiconductorProducts = Task.Factory.StartNew(() => { GetPartGroupForSemiconductorProducts(); });
-            Task getPartGroupForPassiveComponents = Task.Factory.StartNew(() => { GetPartGroupForPassiveComponents(); });
-            Task getPartGroupForInterconnectProducts = Task.Factory.StartNew(() => { GetPartGroupForInterconnectProducts(); });
-            Task getPartGroupForMechanicalElectronicProducts = Task.Factory.StartNew(() => { GetPartGroupForMechanicalElectronicProducts(); });
-            Task getPartGroupForPhotoelectricElement = Task.Factory.StartNew(() => { GetPartGroupForPhotoelectricElement(); });
+            //Task getPartGroupForPassiveComponents = Task.Factory.StartNew(() => { GetPartGroupForPassiveComponents(); });
+            //Task getPartGroupForInterconnectProducts = Task.Factory.StartNew(() => { GetPartGroupForInterconnectProducts(); });
+            //Task getPartGroupForMechanicalElectronicProducts = Task.Factory.StartNew(() => { GetPartGroupForMechanicalElectronicProducts(); });
+            //Task getPartGroupForPhotoelectricElement = Task.Factory.StartNew(() => { GetPartGroupForPhotoelectricElement(); });
 
-            Task[] taskList = { getPartGroupForSemiconductorProducts, getPartGroupForPassiveComponents, getPartGroupForInterconnectProducts,
-                                getPartGroupForMechanicalElectronicProducts, getPartGroupForPhotoelectricElement};
+            //Task[] taskList = { getPartGroupForSemiconductorProducts, getPartGroupForPassiveComponents, getPartGroupForInterconnectProducts,
+            //                    getPartGroupForMechanicalElectronicProducts, getPartGroupForPhotoelectricElement};
+
+            Task[] taskList = { getPartGroupForSemiconductorProducts };
 
             try
             {
@@ -247,7 +247,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     }
                     else
                     {
-                        HtmlDocument widgetHtmlDoc = htmlWeb.Load(widget.Url);
+                        HtmlDocument widgetHtmlDoc = Common.Common.RetryRequest(widget.Url);
                         HtmlNodeCollection liList = widgetHtmlDoc.DocumentNode.SelectNodes(partGroupXpath);
                         int partGroupId = 1;
 
@@ -258,7 +258,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                             partGroupUrl = DIGIKEYHOMEURL + anchorNode.Attributes["href"].Value;
 
                             PartGroup partGroup = new PartGroup(partGroupId.ToString(), partGroupName, partGroupUrl);
-                            HtmlDocument partGroupHtmlDoc = htmlWeb.Load(partGroupUrl);
+                            HtmlDocument partGroupHtmlDoc = Common.Common.RetryRequest(partGroupUrl);
 
                             HtmlNodeCollection trList = partGroupHtmlDoc.DocumentNode.SelectNodes(partXpath);
 
@@ -326,6 +326,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                                     //Todo: add price information to part after 2015-04-10
 
                                     partGroup.Parts.Add(part);
+                                    break;
                                 }
                             }
                             else
@@ -335,8 +336,10 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
                             widget.PartGroups.Add(partGroup);
                             partGroupId++;
+                            break;
                         }
                     }
+                    break;
                 }
             }
         }
@@ -414,21 +417,51 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
         private void PrepareCategoryDataTables()
         {
+            SqlGuid guid0;
+            SqlGuid guid1;
+            SqlGuid guid2;
+            SqlGuid guid3;
             foreach (XElement category in scrapedData.XPathSelectElements("cats/cat"))
             {
-                DataRow dr = categoryDataTables[0].NewRow();
-                dr["GUID"] = (SqlGuid)System.Guid.NewGuid();
-                dr["Name"] = XmlHelpers.GetAttribute(category, "n");
-                dr["ParentID"] = "";
-                dr["Comment"] = "";
-                categoryDataTables[0].Rows.Add(dr);
+                guid0 = (SqlGuid)System.Guid.NewGuid();
+                AddRow(categoryDataTables[0], category, guid0, "");
+
+                foreach(XElement subCategory in category.XPathSelectElements("subcats/subcat"))
+                {
+                    guid1 = (SqlGuid)System.Guid.NewGuid();
+                    AddRow(categoryDataTables[1], subCategory, guid1, guid0.ToString());
+
+                    foreach(XElement widget in category.XPathSelectElements("wgts/wgt"))
+                    {
+                        guid2 = (SqlGuid)System.Guid.NewGuid();
+                        AddRow(categoryDataTables[2], widget, guid2, guid1.ToString());
+
+                        foreach(XElement partGroup in category.XPathSelectElements("pgs/pg"))
+                        {
+                            guid3 = (SqlGuid)System.Guid.NewGuid();
+                            AddRow(categoryDataTables[3], partGroup, guid3, guid2.ToString());
+                        }
+                    }
+                }
             }
+        }
+
+        private void AddRow(DataTable dt, XElement type, SqlGuid currentGuid, string parentId)
+        {
+            DataRow dr = dt.NewRow();
+            dr["GUID"] = currentGuid;
+            dr["Name"] = XmlHelpers.GetAttribute(type, "n");
+            dr["ParentID"] = parentId.ToUpper();
+            dr["Comment"] = "";
+            dt.Rows.Add(dr);
         }
 
         private void InsertDataToDatabase()
         {
-            //Inert data to [产品分类]
-            DataCenter.InsertDataToDatabase(categoryDataTables[0]);
+            for (int i = 0; i < 4; i++)
+            {
+                DataCenter.InsertDataToDatabase(categoryDataTables[i]);
+            }            
         }
     }
 }
