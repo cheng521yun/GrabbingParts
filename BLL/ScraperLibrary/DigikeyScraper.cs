@@ -20,7 +20,8 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private const string SUPPLIERNAME = "digikey";
         private const string DIGIKEYHOMEURL = "http://www.digikey.cn";
         private const string BAOZHUANG = "包装";
-        private const string XIANGGUANCHANPIN = "相关产品";
+        private const int manufacturerLength = 32;
+        private const int productSpecContentLength = 64;
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         private Supplier supplier = new Supplier();
         private XElement scrapedData = XElement.Parse(string.Format("<r name=\"{0}\" url=\"{1}\"><cats/></r>", SUPPLIERNAME, DIGIKEYHOMEURL));
@@ -30,7 +31,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private DataTable supplierDataTable = new DataTable(); 
         private DataTable manufacturerDataTable = new DataTable();
         private Dictionary<string, SqlGuid> manufacturerDictionary = new Dictionary<string, SqlGuid>();
-        private DataTable productInfoDataTable = new DataTable();
+        private DataTable productInfoDataTable = new DataTable();        
 
         public static HtmlDocument baseHtmlDoc = new HtmlDocument();
 
@@ -73,9 +74,9 @@ namespace GrabbingParts.BLL.ScraperLibrary
             log.DebugFormat("PrepareScrapedData finish.cost:{0}ms", sw.ElapsedMilliseconds);
             log.DebugFormat("Part count:{0}", partCount);
 
-            InitCategoryDataTables();
+            InitDataTables();
 
-            PrepareCategoryDataTables();
+            PrepareDataTables();
 
             InsertDataToDatabase();
         }
@@ -220,14 +221,55 @@ namespace GrabbingParts.BLL.ScraperLibrary
         /// <param name="categoryIndex"></param>
         private void GetPartGroupForCategory(int categoryIndex)
         {
-            HtmlWeb htmlWeb = new HtmlWeb();
-            string partGroupXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/ul[@id='productIndexList']/li[@class='catfilteritem']/ul[@class='catfiltersub']/li";
+            string partGroupXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/ul[@id='productIndexList']/li[@class='catfilteritem']/ul[@class='catfiltersub']/li";            
+            string partGroupName;
+            string partsUrl;
+            HtmlNode anchorNode;
+
+            foreach (SubCategory subCategory in supplier.Categories[categoryIndex].SubCategories)
+            {
+                foreach (Widget widget in subCategory.Widgets)
+                {
+                    bool noPartGroup = StringHelpers.IsInteger(StringHelpers.GetLastDirectory(widget.Url));
+                    if (noPartGroup)
+                    {
+                        PartGroup partGroup = new PartGroup("1", "PartGroup", widget.Url);                        
+
+                        AddParts(partGroup, widget.Url);
+
+                        widget.PartGroups.Add(partGroup);
+                    }
+                    else
+                    {
+                        HtmlDocument widgetHtmlDoc = Common.Common.RetryRequest(widget.Url);
+                        HtmlNodeCollection liList = widgetHtmlDoc.DocumentNode.SelectNodes(partGroupXpath);
+                        int partGroupId = 1;
+
+                        foreach (HtmlNode li in liList)
+                        {
+                            anchorNode = li.SelectSingleNode("a");
+                            partGroupName = anchorNode.InnerText;
+                            partsUrl = DIGIKEYHOMEURL + anchorNode.Attributes["href"].Value;
+
+                            PartGroup partGroup = new PartGroup(partGroupId.ToString(), partGroupName, partsUrl);
+
+                            AddParts(partGroup, partsUrl);
+
+                            widget.PartGroups.Add(partGroup);
+                            partGroupId++;
+                            break;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        private void AddParts(PartGroup partGroup, string partsUrl)
+        {
             string partXpath = "//table[@id='productTable']//tbody/tr";
             string partDetailXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/table[@class='product-additional-info']/tr/td[@class='attributes-table-main']/table/tr[5]/td";
             string productSpecXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/table[@class='product-additional-info']/tr/td[@class='attributes-table-main']/table/tr";
-            string partGroupName;
-            string partGroupUrl;
-            HtmlNode anchorNode;
             string partId;
             string partUrl;
             string manufacturer;
@@ -240,114 +282,83 @@ namespace GrabbingParts.BLL.ScraperLibrary
             string productSpecName;
             string productSpecContent;
 
-            foreach (SubCategory subCategory in supplier.Categories[categoryIndex].SubCategories)
+            HtmlDocument partGroupHtmlDoc = Common.Common.RetryRequest(partsUrl);
+            HtmlNodeCollection trList = partGroupHtmlDoc.DocumentNode.SelectNodes(partXpath);
+
+            if (trList != null)
             {
-                foreach (Widget widget in subCategory.Widgets)
+                foreach (HtmlNode tr in trList)
                 {
-                    bool noPartGroup = StringHelpers.IsInteger(StringHelpers.GetLastDirectory(widget.Url));
-                    if (noPartGroup)
+                    partId = tr.SelectSingleNode("td[@class='mfg-partnumber']/a/span").InnerText;
+                    partUrl = DIGIKEYHOMEURL + tr.SelectSingleNode("td[@class='mfg-partnumber']/a").Attributes["href"].Value;
+                    manufacturer = tr.SelectSingleNode("td[@class='vendor']/span//span").InnerText;
+                    description = tr.SelectSingleNode("td[@class='description']").InnerText;
+
+                    zoomImageNode = tr.SelectSingleNode("td[@class='image']/a/img").Attributes["zoomimg"];
+                    if (zoomImageNode != null)
                     {
-                        widget.PartGroups.Add(new PartGroup("1", "PartGroup", widget.Url));
+                        zoomImageUrl = zoomImageNode.Value;
                     }
                     else
                     {
-                        HtmlDocument widgetHtmlDoc = Common.Common.RetryRequest(widget.Url);
-                        HtmlNodeCollection liList = widgetHtmlDoc.DocumentNode.SelectNodes(partGroupXpath);
-                        int partGroupId = 1;
+                        zoomImageUrl = "";
+                    }
 
-                        foreach (HtmlNode li in liList)
+                    imageUrl = tr.SelectSingleNode("td[@class='image']/a/img").Attributes["src"].Value;
+
+                    if (tr.SelectSingleNode("td[@class='rd-datasheet']/center/a") != null)
+                    {
+                        datasheetUrl = tr.SelectSingleNode("td[@class='rd-datasheet']/center/a").Attributes["href"].Value;
+                    }
+                    else
+                    {
+                        datasheetUrl = "";
+                    }
+
+                    HtmlDocument partHtmlDoc = Common.Common.RetryRequest(partUrl);
+                    HtmlNodeCollection productSpecList = null;
+
+                    if (partHtmlDoc != null)
+                    {
+                        HtmlNode packingNode = partHtmlDoc.DocumentNode.SelectSingleNode(partDetailXpath);
+                        packing = packingNode.InnerText;
+                        productSpecList = partHtmlDoc.DocumentNode.SelectNodes(productSpecXpath);
+                    }
+                    else
+                    {
+                        packing = "";
+                    }
+
+                    Part part = new Part(partId, manufacturer, partUrl, description, zoomImageUrl,
+                        imageUrl, datasheetUrl, packing);
+
+                    if (productSpecList != null)
+                    {
+                        foreach (HtmlNode node in productSpecList)
                         {
-                            anchorNode = li.SelectSingleNode("a");
-                            partGroupName = anchorNode.InnerText;
-                            partGroupUrl = DIGIKEYHOMEURL + anchorNode.Attributes["href"].Value;
+                            productSpecName = node.SelectSingleNode("th").InnerText;
+                            productSpecContent = node.SelectSingleNode("td").InnerText;
 
-                            PartGroup partGroup = new PartGroup(partGroupId.ToString(), partGroupName, partGroupUrl);
-                            HtmlDocument partGroupHtmlDoc = Common.Common.RetryRequest(partGroupUrl);
-
-                            HtmlNodeCollection trList = partGroupHtmlDoc.DocumentNode.SelectNodes(partXpath);
-
-                            if (trList != null)
+                            if (!productSpecName.Contains(BAOZHUANG))
                             {
-                                foreach (HtmlNode tr in trList)
+                                if (productSpecContent.Length > productSpecContentLength)
                                 {
-                                    partId = tr.SelectSingleNode("td[@class='mfg-partnumber']/a/span").InnerText;
-                                    partUrl = DIGIKEYHOMEURL + tr.SelectSingleNode("td[@class='mfg-partnumber']/a").Attributes["href"].Value;
-                                    manufacturer = tr.SelectSingleNode("td[@class='vendor']/span//span").InnerText;
-                                    description = tr.SelectSingleNode("td[@class='description']").InnerText;
-
-                                    zoomImageNode = tr.SelectSingleNode("td[@class='image']/a/img").Attributes["zoomimg"];
-                                    if (zoomImageNode != null)
-                                    {
-                                        zoomImageUrl = zoomImageNode.Value;
-                                    }
-                                    else
-                                    {
-                                        zoomImageUrl = "";
-                                    }
-
-                                    imageUrl = tr.SelectSingleNode("td[@class='image']/a/img").Attributes["src"].Value;
-
-                                    if (tr.SelectSingleNode("td[@class='rd-datasheet']/center/a") != null)
-                                    {
-                                        datasheetUrl = tr.SelectSingleNode("td[@class='rd-datasheet']/center/a").Attributes["href"].Value;
-                                    }
-                                    else
-                                    {
-                                        datasheetUrl = "";
-                                    }
-
-                                    HtmlDocument partHtmlDoc = Common.Common.RetryRequest(partUrl);
-                                    HtmlNodeCollection productSpecList = null;
-
-                                    if (partHtmlDoc != null)
-                                    {
-                                        HtmlNode packingNode = partHtmlDoc.DocumentNode.SelectSingleNode(partDetailXpath);
-                                        packing = packingNode.InnerText;
-                                        productSpecList = partHtmlDoc.DocumentNode.SelectNodes(productSpecXpath);
-                                    }
-                                    else
-                                    {
-                                        packing = "";
-                                    }
-
-                                    Part part = new Part(partId, manufacturer, partUrl, description, zoomImageUrl,
-                                        imageUrl, datasheetUrl, packing);
-
-                                    if (productSpecList != null)
-                                    {
-                                        foreach (HtmlNode node in productSpecList)
-                                        {
-                                            productSpecName = node.SelectSingleNode("th").InnerText;
-                                            productSpecContent = node.SelectSingleNode("td").InnerText;
-
-                                            if (!productSpecName.Contains(BAOZHUANG))
-                                            {
-                                                if (productSpecName == XIANGGUANCHANPIN)
-                                                {
-                                                    productSpecContent = productSpecContent.Substring(0, 64);
-                                                }
-                                                part.ProductSpecifications.Add(new ProductSpecification(productSpecName, productSpecContent));
-                                            }
-                                        }
-                                    }
-
-                                    //Todo: add price information to part after 2015-04-10
-
-                                    partGroup.Parts.Add(part);
+                                    productSpecContent = productSpecContent.Substring(0, productSpecContentLength);
                                 }
+                                part.ProductSpecifications.Add(new ProductSpecification(productSpecName, productSpecContent));
                             }
-                            else
-                            {
-                                //Todo: add the partGroupUrl to log file
-                            }
-
-                            widget.PartGroups.Add(partGroup);
-                            partGroupId++;
-                            break;
                         }
                     }
+
+                    //Todo: add price information to part after 2015-04-10
+
+                    partGroup.Parts.Add(part);
                     break;
                 }
+            }
+            else
+            {
+                //Todo: add the partGroupUrl to log file
             }
         }
 
@@ -392,7 +403,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                                                                     new XAttribute("des", part.Description),
                                                                     new XAttribute("zoo", StringHelpers.GetLastDirectory(part.ZoomImageUrl)),
                                                                     new XAttribute("img", StringHelpers.GetLastDirectory(part.ImageUrl)),
-                                                                    new XAttribute("ds", StringHelpers.GetLastDirectory(part.DatasheetUrl)),
+                                                                    new XAttribute("ds", part.DatasheetUrl != "" ? (part.Id + ".pdf") : ""),
                                                                     new XAttribute("pack", part.Packing.TrimStart().TrimEnd()));
                                 
                                 foreach(ProductSpecification ps in part.ProductSpecifications)
@@ -414,7 +425,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         /// <summary>
         /// Init category data tables
         /// </summary>
-        private void InitCategoryDataTables()
+        private void InitDataTables()
         {
             for (int i = 0; i < 4; i++)
             {
@@ -453,7 +464,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
             productInfoDataTable.Columns.Add("Image", typeof(string));
         }
 
-        private void PrepareCategoryDataTables()
+        private void PrepareDataTables()
         {
             SqlGuid guid0;
             SqlGuid guid1;
@@ -480,11 +491,18 @@ namespace GrabbingParts.BLL.ScraperLibrary
                         foreach (XElement partGroup in widget.XPathSelectElements("pgs/pg"))
                         {
                             guid3 = (SqlGuid)System.Guid.NewGuid();
-                            AddRow(categoryDataTables[3], partGroup, guid3, guid2.ToString());
+                            if (XmlHelpers.GetAttribute(partGroup, "n") != "PartGroup")
+                            {
+                                AddRow(categoryDataTables[3], partGroup, guid3, guid2.ToString());
+                            }
 
                             foreach(XElement part in partGroup.XPathSelectElements("ps/p"))
                             {
                                 manufacturer = XmlHelpers.GetAttribute(part, "mft");
+                                if (manufacturer.Length > manufacturerLength)
+                                {
+                                    manufacturer = manufacturer.Substring(0, manufacturerLength);
+                                }
                                 DataRow drProductInfo = productInfoDataTable.NewRow();
                                 drProductInfo["GUID"] = (SqlGuid)System.Guid.NewGuid();
                                 drProductInfo["PN"] = XmlHelpers.GetAttribute(part, "id");
@@ -554,7 +572,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         {
             for (int i = 0; i < 4; i++)
             {
-                DataCenter.InsertDataToDatabase(categoryDataTables[i]);
+                DataCenter.InsertDataToCategory(categoryDataTables[i]);
             }
 
             DataCenter.InsertDataToProductSpecTable(productSpecDataTable);

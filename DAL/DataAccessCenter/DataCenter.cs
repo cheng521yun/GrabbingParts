@@ -12,7 +12,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         private static string connectionString = ConfigurationManager.ConnectionStrings["WXH"].ToString();
 
-        public static void InsertDataToDatabase(DataTable dt)
+        public static void InsertDataToCategory(DataTable dt)
         {
             SqlConnection connection = new SqlConnection(connectionString);
 
