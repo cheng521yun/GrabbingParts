@@ -265,11 +265,13 @@ namespace GrabbingParts.BLL.ScraperLibrary
             }
         }
 
-        private void AddParts(PartGroup partGroup, string partsUrl)
+        private void AddParts(PartGroup partGroup, string partsUrl, int currentPage = 1)
         {
+            if (currentPage == 3) return;
             string partXpath = "//table[@id='productTable']//tbody/tr";
             string partDetailXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/table[@class='product-additional-info']/tr/td[@class='attributes-table-main']/table/tr[5]/td";
             string productSpecXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/table[@class='product-additional-info']/tr/td[@class='attributes-table-main']/table/tr";
+            string currentPageXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/div[@class='paging'][1]/span[@class='current-page']";
             string partId;
             string partUrl;
             string manufacturer;
@@ -282,8 +284,8 @@ namespace GrabbingParts.BLL.ScraperLibrary
             string productSpecName;
             string productSpecContent;
 
-            HtmlDocument partGroupHtmlDoc = Common.Common.RetryRequest(partsUrl);
-            HtmlNodeCollection trList = partGroupHtmlDoc.DocumentNode.SelectNodes(partXpath);
+            HtmlDocument partsHtmlDoc = Common.Common.RetryRequest(AddPageSizeToPartsUrl(partsUrl));
+            HtmlNodeCollection trList = partsHtmlDoc.DocumentNode.SelectNodes(partXpath);
 
             if (trList != null)
             {
@@ -355,10 +357,48 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     partGroup.Parts.Add(part);
                     break;
                 }
+
+                HtmlNode currentPageNode = partsHtmlDoc.DocumentNode.SelectSingleNode(currentPageXpath);
+                string currentPageValue = currentPageNode.InnerText;
+                string tmpTotalPage = StringHelpers.GetLastDirectory(currentPageValue);
+                int totalPage = 0;
+                Int32.TryParse(tmpTotalPage, out totalPage);
+                
+                if(totalPage > currentPage)
+                {
+                    int nextPage = currentPage + 1;
+                    string nextPageUrl;
+                    if (partsUrl.IndexOf("/page/") > 0)
+                    {
+                        nextPageUrl = partsUrl.Replace("/page/" + currentPage.ToString(), "/page/" + nextPage.ToString());
+                    }
+                    else
+                    {
+                        nextPageUrl = partsUrl + "/page/" + nextPage.ToString();
+                    }
+                    AddParts(partGroup, nextPageUrl, nextPage);
+                }
             }
             else
             {
                 //Todo: add the partGroupUrl to log file
+            }
+        }
+
+        /// <summary>
+        /// Add pagesize to parts url
+        /// </summary>
+        /// <param name="partsUrl"></param>
+        /// <returns></returns>
+        private string AddPageSizeToPartsUrl(string partsUrl)
+        {
+            if(partsUrl.IndexOf("?") > 0)
+            {
+                return partsUrl + "&pagesize=500";
+            }
+            else
+            {
+                return partsUrl + "?pagesize=500";
             }
         }
 
