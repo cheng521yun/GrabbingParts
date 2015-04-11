@@ -22,6 +22,8 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private const string BAOZHUANG = "包装";
         private const int manufacturerLength = 32;
         private const int productSpecContentLength = 64;
+        private const int descriptionLength = 64;
+        private const int packingLength = 64;
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         private Supplier supplier = new Supplier();
         private XElement scrapedData = XElement.Parse(string.Format("<r name=\"{0}\" url=\"{1}\"><cats/></r>", SUPPLIERNAME, DIGIKEYHOMEURL));
@@ -78,15 +80,12 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
             PrepareDataTables();
 
-            InsertDataToDatabase();
+            DataCenter.ExecuteTransaction(categoryDataTables, productSpecDataTable, supplierDataTable,
+            manufacturerDataTable, productInfoDataTable);
         }
 
         private void GetBaseHtmlDocument()
         {
-            //string textHome = HttpHelpers.HttpHelpers.GetText(homeUrl, 10000);          
-            //string url = "http://www.digikey.com.cn/search/zh?c=406&f=408&f=409&f=410&f=411&f=412&f=413&f=414";
-            //string text = HttpHelpers.HttpHelpers.GetText(url,10000);
-
             baseHtmlDoc = Common.Common.RetryRequest(DIGIKEYHOMEURL);
         }
 
@@ -257,10 +256,8 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
                             widget.PartGroups.Add(partGroup);
                             partGroupId++;
-                            break;
                         }
                     }
-                    break;
                 }
             }
         }
@@ -355,7 +352,6 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     //Todo: add price information to part after 2015-04-10
 
                     partGroup.Parts.Add(part);
-                    break;
                 }
 
                 HtmlNode currentPageNode = partsHtmlDoc.DocumentNode.SelectSingleNode(currentPageXpath);
@@ -511,6 +507,8 @@ namespace GrabbingParts.BLL.ScraperLibrary
             SqlGuid guid2;
             SqlGuid guid3;
             string manufacturer;
+            string description;
+            string packing;
             SqlGuid manufacturerGuid;
 
             foreach (XElement category in scrapedData.XPathSelectElements("cats/cat"))
@@ -565,9 +563,19 @@ namespace GrabbingParts.BLL.ScraperLibrary
                                     drProductInfo["ManufacturerID"] = manufacturerDictionary[manufacturer];
                                 }
 
-                                drProductInfo["Description"] = XmlHelpers.GetAttribute(part, "des");
-                                drProductInfo["Packing"] = XmlHelpers.GetAttribute(part, "pack");
-                                drProductInfo["Packing"] = XmlHelpers.GetAttribute(part, "pack");
+                                description = XmlHelpers.GetAttribute(part, "des");
+                                if (description.Length > descriptionLength)
+                                {
+                                    description = description.Substring(0, descriptionLength);
+                                }
+
+                                packing = XmlHelpers.GetAttribute(part, "pack");
+                                if (packing.Length > packingLength)
+                                {
+                                    packing = packing.Substring(0, packingLength);
+                                }
+                                drProductInfo["Description"] = description;
+                                drProductInfo["Packing"] = packing;
                                 drProductInfo["Type1"] = guid0.ToString().ToUpper();
                                 drProductInfo["Type2"] = guid1.ToString().ToUpper();
                                 drProductInfo["Type3"] = guid2.ToString().ToUpper();
@@ -608,7 +616,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
             dt.Rows.Add(dr);
         }
 
-        private void InsertDataToDatabase()
+        /*private void InsertDataToDatabase()
         {
             for (int i = 0; i < 4; i++)
             {
@@ -619,6 +627,6 @@ namespace GrabbingParts.BLL.ScraperLibrary
             DataCenter.InsertDataToSupplier(supplierDataTable);
             DataCenter.InsertDataToManufacturer(manufacturerDataTable);
             DataCenter.InsertDataToProductInfo(productInfoDataTable);
-        }
+        }*/
     }
 }
