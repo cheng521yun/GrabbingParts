@@ -97,12 +97,10 @@ namespace GrabbingParts.BLL.ScraperLibrary
             string xpathForCategory = "/html/body/div[@id='wrapper']/div[@id='top_categories']/a[@id='topnav-link']/table[@id='toprow']/tr/td[img]";
             HtmlNodeCollection uiCategoryList = baseHtmlDoc.DocumentNode.SelectNodes(xpathForCategory);
             int key = 1;
-            string categoryName = "";
 
             foreach (HtmlNode uiCategory in uiCategoryList)
             {
-                categoryName = XmlHelpers.GetText(uiCategory);
-                supplier.Categories.Add(new Category(key.ToString(), categoryName));
+                supplier.Categories.Add(new Category(key.ToString(), XmlHelpers.GetText(uiCategory)));
                 key++;
             }
         }
@@ -114,11 +112,11 @@ namespace GrabbingParts.BLL.ScraperLibrary
         {
             string xpathForSubCategory = "/html/body/div[@id='wrapper']/div[@id='top_categories']/div[@id='topnav']/table[@id='bottomrow']/tr/td[a]";
             HtmlNodeCollection uiSubCategoryList = baseHtmlDoc.DocumentNode.SelectNodes(xpathForSubCategory);
-            string subCategoryId = "";
-            string subCategoryName = "";
+            string subCategoryId;
+            string subCategoryName;
             int widgetId = 1;
-            string widgetName = "";
-            string widgetUrl = "";
+            string widgetName;
+            string widgetUrl;
             int i = 0;
             HtmlNode anchorNode;
 
@@ -180,6 +178,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private void GetPartGroupForSemiconductorProducts()
         {
             GetPartGroupWithTask(0);
+            log.Debug("GetPartGroupForSemiconductorProducts finished.");
         }
 
         /// <summary>
@@ -188,6 +187,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private void GetPartGroupForPassiveComponents()
         {
             GetPartGroupWithTask(1);
+            log.Debug("GetPartGroupForPassiveComponents finished.");
         }
 
         /// <summary>
@@ -196,6 +196,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private void GetPartGroupForInterconnectProducts()
         {
             GetPartGroupWithTask(2);
+            log.Debug("GetPartGroupForInterconnectProducts finished.");
         }
 
         /// <summary>
@@ -204,6 +205,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private void GetPartGroupForMechanicalElectronicProducts()
         {
             GetPartGroupWithTask(3);
+            log.Debug("GetPartGroupForMechanicalElectronicProducts finished.");
         }
 
         /// <summary>
@@ -212,6 +214,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private void GetPartGroupForPhotoelectricElement()
         {
             GetPartGroupWithTask(4);
+            log.Debug("GetPartGroupForPhotoelectricElement finished.");
         }
 
         /// <summary>
@@ -223,7 +226,22 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
             foreach (SubCategory subCategory in supplier.Categories[categoryIndex].SubCategories)
             {
-                tasks.Add(Task.Factory.StartNew(() => GetPartGroupForSubCategory(subCategory)));
+                tasks.Add(Task.Factory.StartNew(() => GetPartGroupWithChildTask(subCategory)));
+            }
+
+            Task.WaitAll(tasks.ToArray());
+        }
+
+        /// <summary>
+        /// Use task in Widget level
+        /// </summary>
+        private void GetPartGroupWithChildTask(SubCategory subCategory)
+        {
+            List<Task> tasks = new List<Task>();
+
+            foreach (Widget widget in subCategory.Widgets)
+            {
+                tasks.Add(Task.Factory.StartNew(() => GetPartGroupForWidget(widget)));
             }
 
             Task.WaitAll(tasks.ToArray());
@@ -233,43 +251,40 @@ namespace GrabbingParts.BLL.ScraperLibrary
         /// Get part group for each category
         /// </summary>
         /// <param name="categoryIndex"></param>
-        private void GetPartGroupForSubCategory(SubCategory subCategory)
+        private void GetPartGroupForWidget(Widget widget)
         {
             string partGroupXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/ul[@id='productIndexList']/li[@class='catfilteritem']/ul[@class='catfiltersub']/li";
             string partGroupName;
             string partsUrl;
             HtmlNode anchorNode;
 
-            foreach (Widget widget in subCategory.Widgets)
+            bool noPartGroup = StringHelpers.IsInteger(StringHelpers.GetLastDirectory(widget.Url));
+            if (noPartGroup)
             {
-                bool noPartGroup = StringHelpers.IsInteger(StringHelpers.GetLastDirectory(widget.Url));
-                if (noPartGroup)
-                {
-                    PartGroup partGroup = new PartGroup("1", "PartGroup", widget.Url);
+                PartGroup partGroup = new PartGroup("1", "PartGroup", widget.Url);
 
-                    AddParts(partGroup, widget.Url);
+                AddParts(partGroup, widget.Url);
+
+                widget.PartGroups.Add(partGroup);
+            }
+            else
+            {
+                HtmlDocument widgetHtmlDoc = Common.Common.RetryRequest(widget.Url);
+                HtmlNodeCollection liList = widgetHtmlDoc.DocumentNode.SelectNodes(partGroupXpath);
+                int partGroupId = 1;
+
+                foreach (HtmlNode li in liList)
+                {
+                    anchorNode = li.SelectSingleNode("a");
+                    partGroupName = XmlHelpers.GetText(anchorNode);
+                    partsUrl = DIGIKEYHOMEURL + anchorNode.Attributes["href"].Value;
+
+                    PartGroup partGroup = new PartGroup(partGroupId.ToString(), partGroupName, partsUrl);
+
+                    AddParts(partGroup, partsUrl);
 
                     widget.PartGroups.Add(partGroup);
-                }
-                else
-                {
-                    HtmlDocument widgetHtmlDoc = Common.Common.RetryRequest(widget.Url);
-                    HtmlNodeCollection liList = widgetHtmlDoc.DocumentNode.SelectNodes(partGroupXpath);
-                    int partGroupId = 1;
-
-                    foreach (HtmlNode li in liList)
-                    {
-                        anchorNode = li.SelectSingleNode("a");
-                        partGroupName = XmlHelpers.GetText(anchorNode);
-                        partsUrl = DIGIKEYHOMEURL + anchorNode.Attributes["href"].Value;
-
-                        PartGroup partGroup = new PartGroup(partGroupId.ToString(), partGroupName, partsUrl);
-
-                        AddParts(partGroup, partsUrl);
-
-                        widget.PartGroups.Add(partGroup);
-                        partGroupId++;
-                    }
+                    partGroupId++;
                 }
             }
         }
