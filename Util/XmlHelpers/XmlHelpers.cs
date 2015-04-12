@@ -12,6 +12,7 @@ using System.Xml.Xsl;
 using Microsoft.Practices.EnterpriseLibrary.Caching;
 using Microsoft.Practices.EnterpriseLibrary.Caching.Expirations;
 using Mvp.Xml.Common.XPath;
+using HtmlAgilityPack;
 
 namespace GrabbingParts.Util.XmlHelpers
 {
@@ -257,6 +258,30 @@ namespace GrabbingParts.Util.XmlHelpers
         public static string GetText(XmlDocument dom, string xpath)
         {
             XmlNode node = dom.SelectSingleNode(xpath);
+            return node != null ? node.InnerText : "";
+        }
+
+        /// <summary>
+        /// Get text from an xml node.
+        /// </summary>
+        /// <param name="dom">Document to query.</param>
+        /// <param name="xpath">XPath query to find node.</param>
+        /// <returns>Node value or blank if not found.</returns>
+        public static string GetText(HtmlNode node, string xpath)
+        {
+            if(node != null)
+            {
+                HtmlNode tmpNode = node.SelectSingleNode(xpath);
+                return tmpNode != null ? tmpNode.InnerText : "";
+            }
+            else
+            {
+                return "";
+            }
+        }
+
+        public static string GetText(HtmlNode node)
+        {
             return node != null ? node.InnerText : "";
         }
 

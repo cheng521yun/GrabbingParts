@@ -73,6 +73,12 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="XmlHelpers.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\BLL\HtmlAgilityPack\HtmlAgilityPack.csproj">
+      <Project>{193bb801-054f-4729-9d5d-fce1e32594bf}</Project>
+      <Name>HtmlAgilityPack</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

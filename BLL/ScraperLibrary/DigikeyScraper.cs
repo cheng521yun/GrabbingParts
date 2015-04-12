@@ -101,7 +101,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
             foreach (HtmlNode uiCategory in uiCategoryList)
             {
-                categoryName = uiCategory.InnerText;
+                categoryName = XmlHelpers.GetText(uiCategory);
                 supplier.Categories.Add(new Category(key.ToString(), categoryName));
                 key++;
             }
@@ -128,7 +128,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                 foreach (HtmlNode uiAnchor in uiAnchorList)
                 {
                     subCategoryId = uiAnchor.Attributes["id"].Value;
-                    subCategoryName = uiAnchor.InnerText;
+                    subCategoryName = XmlHelpers.GetText(uiAnchor);
                     SubCategory subCategory = new SubCategory(subCategoryId, subCategoryName);
                     HtmlNode ul = uiAnchor.NextSibling.NextSibling;
                     HtmlNodeCollection liList = ul.SelectNodes("li");
@@ -137,7 +137,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     foreach (HtmlNode li in liList)
                     {
                         anchorNode = li.SelectSingleNode("a");
-                        widgetName = anchorNode.InnerText;
+                        widgetName = XmlHelpers.GetText(anchorNode);
                         widgetUrl = anchorNode.Attributes["href"].Value;
                         subCategory.Widgets.Add(new Widget(widgetId.ToString(), widgetName, widgetUrl));
                         widgetId++;
@@ -247,7 +247,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                         foreach (HtmlNode li in liList)
                         {
                             anchorNode = li.SelectSingleNode("a");
-                            partGroupName = anchorNode.InnerText;
+                            partGroupName = XmlHelpers.GetText(anchorNode);
                             partsUrl = DIGIKEYHOMEURL + anchorNode.Attributes["href"].Value;
 
                             PartGroup partGroup = new PartGroup(partGroupId.ToString(), partGroupName, partsUrl);
@@ -288,10 +288,10 @@ namespace GrabbingParts.BLL.ScraperLibrary
             {
                 foreach (HtmlNode tr in trList)
                 {
-                    partId = tr.SelectSingleNode("td[@class='mfg-partnumber']/a/span").InnerText;
+                    partId = XmlHelpers.GetText(tr, "td[@class='mfg-partnumber']/a/span");
                     partUrl = DIGIKEYHOMEURL + tr.SelectSingleNode("td[@class='mfg-partnumber']/a").Attributes["href"].Value;
-                    manufacturer = tr.SelectSingleNode("td[@class='vendor']/span//span").InnerText;
-                    description = tr.SelectSingleNode("td[@class='description']").InnerText;
+                    manufacturer = XmlHelpers.GetText(tr, "td[@class='vendor']/span//span");
+                    description = XmlHelpers.GetText(tr, "td[@class='description']");
 
                     zoomImageNode = tr.SelectSingleNode("td[@class='image']/a/img").Attributes["zoomimg"];
                     if (zoomImageNode != null)
@@ -319,8 +319,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
                     if (partHtmlDoc != null)
                     {
-                        HtmlNode packingNode = partHtmlDoc.DocumentNode.SelectSingleNode(partDetailXpath);
-                        packing = packingNode.InnerText;
+                        packing = XmlHelpers.GetText(partHtmlDoc.DocumentNode, partDetailXpath);
                         productSpecList = partHtmlDoc.DocumentNode.SelectNodes(productSpecXpath);
                     }
                     else
@@ -335,8 +334,8 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     {
                         foreach (HtmlNode node in productSpecList)
                         {
-                            productSpecName = node.SelectSingleNode("th").InnerText;
-                            productSpecContent = node.SelectSingleNode("td").InnerText;
+                            productSpecName = XmlHelpers.GetText(node, "th");
+                            productSpecContent = XmlHelpers.GetText(node, "td");
 
                             if (!productSpecName.Contains(BAOZHUANG))
                             {
@@ -355,7 +354,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                 }
 
                 HtmlNode currentPageNode = partsHtmlDoc.DocumentNode.SelectSingleNode(currentPageXpath);
-                string currentPageValue = currentPageNode.InnerText;
+                string currentPageValue = XmlHelpers.GetText(currentPageNode);
                 string tmpTotalPage = StringHelpers.GetLastDirectory(currentPageValue);
                 int totalPage = 0;
                 Int32.TryParse(tmpTotalPage, out totalPage);
