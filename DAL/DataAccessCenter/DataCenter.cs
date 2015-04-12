@@ -56,6 +56,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
             }
             catch(Exception ex)
             {
+                log.Debug(ex);
                 transaction.Rollback();
             }
         }

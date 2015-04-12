@@ -151,7 +151,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         }
 
         /// <summary>
-        /// Get part group
+        /// Get part group, use task in Category level
         /// </summary>
         private void GetPartGroup()
         {
@@ -179,7 +179,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         /// </summary>
         private void GetPartGroupForSemiconductorProducts()
         {
-            GetPartGroupForCategory(0);
+            GetPartGroupWithTask(0);
         }
 
         /// <summary>
@@ -187,7 +187,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         /// </summary>
         private void GetPartGroupForPassiveComponents()
         {
-            GetPartGroupForCategory(1);
+            GetPartGroupWithTask(1);
         }
 
         /// <summary>
@@ -195,7 +195,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         /// </summary>
         private void GetPartGroupForInterconnectProducts()
         {
-            GetPartGroupForCategory(2);
+            GetPartGroupWithTask(2);
         }
 
         /// <summary>
@@ -203,7 +203,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         /// </summary>
         private void GetPartGroupForMechanicalElectronicProducts()
         {
-            GetPartGroupForCategory(3);
+            GetPartGroupWithTask(3);
         }
 
         /// <summary>
@@ -211,52 +211,64 @@ namespace GrabbingParts.BLL.ScraperLibrary
         /// </summary>
         private void GetPartGroupForPhotoelectricElement()
         {
-            GetPartGroupForCategory(4);
+            GetPartGroupWithTask(4);
+        }
+
+        /// <summary>
+        /// Use task in SubCategory level
+        /// </summary>
+        private void GetPartGroupWithTask(int categoryIndex)
+        {
+            List<Task> tasks = new List<Task>();
+
+            foreach (SubCategory subCategory in supplier.Categories[categoryIndex].SubCategories)
+            {
+                tasks.Add(Task.Factory.StartNew(() => GetPartGroupForSubCategory(subCategory)));
+            }
+
+            Task.WaitAll(tasks.ToArray());
         }
 
         /// <summary>
         /// Get part group for each category
         /// </summary>
         /// <param name="categoryIndex"></param>
-        private void GetPartGroupForCategory(int categoryIndex)
+        private void GetPartGroupForSubCategory(SubCategory subCategory)
         {
-            string partGroupXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/ul[@id='productIndexList']/li[@class='catfilteritem']/ul[@class='catfiltersub']/li";            
+            string partGroupXpath = "/html[@id='responsiveTemplate']/body[@class='ltr']/div[@id='content']/ul[@id='productIndexList']/li[@class='catfilteritem']/ul[@class='catfiltersub']/li";
             string partGroupName;
             string partsUrl;
             HtmlNode anchorNode;
 
-            foreach (SubCategory subCategory in supplier.Categories[categoryIndex].SubCategories)
+            foreach (Widget widget in subCategory.Widgets)
             {
-                foreach (Widget widget in subCategory.Widgets)
+                bool noPartGroup = StringHelpers.IsInteger(StringHelpers.GetLastDirectory(widget.Url));
+                if (noPartGroup)
                 {
-                    bool noPartGroup = StringHelpers.IsInteger(StringHelpers.GetLastDirectory(widget.Url));
-                    if (noPartGroup)
-                    {
-                        PartGroup partGroup = new PartGroup("1", "PartGroup", widget.Url);                        
+                    PartGroup partGroup = new PartGroup("1", "PartGroup", widget.Url);
 
-                        AddParts(partGroup, widget.Url);
+                    AddParts(partGroup, widget.Url);
+
+                    widget.PartGroups.Add(partGroup);
+                }
+                else
+                {
+                    HtmlDocument widgetHtmlDoc = Common.Common.RetryRequest(widget.Url);
+                    HtmlNodeCollection liList = widgetHtmlDoc.DocumentNode.SelectNodes(partGroupXpath);
+                    int partGroupId = 1;
+
+                    foreach (HtmlNode li in liList)
+                    {
+                        anchorNode = li.SelectSingleNode("a");
+                        partGroupName = XmlHelpers.GetText(anchorNode);
+                        partsUrl = DIGIKEYHOMEURL + anchorNode.Attributes["href"].Value;
+
+                        PartGroup partGroup = new PartGroup(partGroupId.ToString(), partGroupName, partsUrl);
+
+                        AddParts(partGroup, partsUrl);
 
                         widget.PartGroups.Add(partGroup);
-                    }
-                    else
-                    {
-                        HtmlDocument widgetHtmlDoc = Common.Common.RetryRequest(widget.Url);
-                        HtmlNodeCollection liList = widgetHtmlDoc.DocumentNode.SelectNodes(partGroupXpath);
-                        int partGroupId = 1;
-
-                        foreach (HtmlNode li in liList)
-                        {
-                            anchorNode = li.SelectSingleNode("a");
-                            partGroupName = XmlHelpers.GetText(anchorNode);
-                            partsUrl = DIGIKEYHOMEURL + anchorNode.Attributes["href"].Value;
-
-                            PartGroup partGroup = new PartGroup(partGroupId.ToString(), partGroupName, partsUrl);
-
-                            AddParts(partGroup, partsUrl);
-
-                            widget.PartGroups.Add(partGroup);
-                            partGroupId++;
-                        }
+                        partGroupId++;
                     }
                 }
             }
@@ -292,6 +304,10 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     partUrl = DIGIKEYHOMEURL + tr.SelectSingleNode("td[@class='mfg-partnumber']/a").Attributes["href"].Value;
                     manufacturer = XmlHelpers.GetText(tr, "td[@class='vendor']/span//span");
                     description = XmlHelpers.GetText(tr, "td[@class='description']");
+                    if (description.Length > descriptionLength)
+                    {
+                        description = description.Substring(0, descriptionLength);
+                    }
 
                     zoomImageNode = tr.SelectSingleNode("td[@class='image']/a/img").Attributes["zoomimg"];
                     if (zoomImageNode != null)
@@ -321,6 +337,10 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     {
                         packing = XmlHelpers.GetText(partHtmlDoc.DocumentNode, partDetailXpath);
                         productSpecList = partHtmlDoc.DocumentNode.SelectNodes(productSpecXpath);
+                        if(packing.Length > packingLength)
+                        {
+                            packing = packing.Substring(0, packingLength);
+                        }
                     }
                     else
                     {
@@ -562,19 +582,8 @@ namespace GrabbingParts.BLL.ScraperLibrary
                                     drProductInfo["ManufacturerID"] = manufacturerDictionary[manufacturer];
                                 }
 
-                                description = XmlHelpers.GetAttribute(part, "des");
-                                if (description.Length > descriptionLength)
-                                {
-                                    description = description.Substring(0, descriptionLength);
-                                }
-
-                                packing = XmlHelpers.GetAttribute(part, "pack");
-                                if (packing.Length > packingLength)
-                                {
-                                    packing = packing.Substring(0, packingLength);
-                                }
-                                drProductInfo["Description"] = description;
-                                drProductInfo["Packing"] = packing;
+                                drProductInfo["Description"] = XmlHelpers.GetAttribute(part, "des");
+                                drProductInfo["Packing"] = XmlHelpers.GetAttribute(part, "pack");
                                 drProductInfo["Type1"] = guid0.ToString().ToUpper();
                                 drProductInfo["Type2"] = guid1.ToString().ToUpper();
                                 drProductInfo["Type3"] = guid2.ToString().ToUpper();
@@ -614,18 +623,5 @@ namespace GrabbingParts.BLL.ScraperLibrary
             dr["Comment"] = "";
             dt.Rows.Add(dr);
         }
-
-        /*private void InsertDataToDatabase()
-        {
-            for (int i = 0; i < 4; i++)
-            {
-                DataCenter.InsertDataToCategory(categoryDataTables[i]);
-            }
-
-            DataCenter.InsertDataToProductSpecTable(productSpecDataTable);
-            DataCenter.InsertDataToSupplier(supplierDataTable);
-            DataCenter.InsertDataToManufacturer(manufacturerDataTable);
-            DataCenter.InsertDataToProductInfo(productInfoDataTable);
-        }*/
     }
 }
