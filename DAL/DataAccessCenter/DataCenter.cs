@@ -13,7 +13,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         private static string connectionString = ConfigurationManager.ConnectionStrings["WXH"].ToString();
 
-        public static void ExecuteTransaction(List<DataTable> categoryDataTables, DataTable productSpecDataTable, DataTable supplierDataTable,
+        public static void ExecuteTransaction(List<DataTable> categoryDataTables, DataTable productSpecDataTable,
             DataTable manufacturerDataTable, DataTable productInfoDataTable)
         {
             SqlConnection conn = new SqlConnection(connectionString);
@@ -27,7 +27,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
 
             try
             {
-                command.CommandText = "DELETE FROM dbo.[产品分类]";
+                /*command.CommandText = "DELETE FROM dbo.[产品分类]";
                 command.ExecuteNonQuery();
 
                 command.CommandText = "DELETE FROM dbo.[产品规格]";
@@ -40,7 +40,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
                 command.ExecuteNonQuery();
 
                 command.CommandText = "DELETE FROM dbo.[供应商资料]";
-                command.ExecuteNonQuery();
+                command.ExecuteNonQuery();*/
 
                 for (int i = 0; i < 4; i++)
                 {
@@ -48,7 +48,6 @@ namespace GrabbingParts.DAL.DataAccessCenter
                 }
 
                 InsertDataToProductSpecTable(conn, transaction, productSpecDataTable);
-                InsertDataToSupplier(conn, transaction, supplierDataTable);
                 InsertDataToManufacturer(conn, transaction, manufacturerDataTable);
                 InsertDataToProductInfo(conn, transaction, productInfoDataTable);
 
@@ -56,7 +55,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
             }
             catch(Exception ex)
             {
-                log.Debug(ex);
+                log.Error(ex);
                 transaction.Rollback();
             }
         }
@@ -102,22 +101,41 @@ namespace GrabbingParts.DAL.DataAccessCenter
             }
         }
 
-        public static void InsertDataToSupplier(SqlConnection conn, SqlTransaction transaction, DataTable dt)
+        public static void InsertDataToSupplier(DataTable dt)
         {
-            using (SqlBulkCopy bulkCopy = new SqlBulkCopy(conn, SqlBulkCopyOptions.Default, transaction))
+            SqlConnection conn = new SqlConnection(connectionString);
+            conn.Open();
+            SqlCommand command = conn.CreateCommand();
+
+            SqlTransaction transaction = null;
+            transaction = conn.BeginTransaction();
+            command.Connection = conn;
+            command.Transaction = transaction;
+
+            try
             {
-                bulkCopy.DestinationTableName = "dbo.[供应商资料]";//目标表，就是说您将要将数据插入到哪个表中去
-                bulkCopy.ColumnMappings.Add("GUID", "GUID");//数据源中的列名与目标表的属性的映射关系
-                bulkCopy.ColumnMappings.Add("Supplier", "Supplier");
-                bulkCopy.ColumnMappings.Add("WebUrl", "WebUrl");
+                using (SqlBulkCopy bulkCopy = new SqlBulkCopy(conn, SqlBulkCopyOptions.Default, transaction))
+                {
+                    bulkCopy.DestinationTableName = "dbo.[供应商资料]";//目标表，就是说您将要将数据插入到哪个表中去
+                    bulkCopy.ColumnMappings.Add("GUID", "GUID");//数据源中的列名与目标表的属性的映射关系
+                    bulkCopy.ColumnMappings.Add("Supplier", "Supplier");
+                    bulkCopy.ColumnMappings.Add("WebUrl", "WebUrl");
 
-                Stopwatch stopwatch = new Stopwatch();//跑表，该类可以进行时间的统计
+                    Stopwatch stopwatch = new Stopwatch();//跑表，该类可以进行时间的统计
 
-                stopwatch.Start();//跑表开始
+                    stopwatch.Start();//跑表开始
 
-                bulkCopy.WriteToServer(dt);//将数据源数据写入到目标表中
+                    bulkCopy.WriteToServer(dt);//将数据源数据写入到目标表中
 
-                log.DebugFormat("插入[供应商资料]数据所用时间:{0}ms", stopwatch.ElapsedMilliseconds);
+                    log.DebugFormat("插入[供应商资料]数据所用时间:{0}ms", stopwatch.ElapsedMilliseconds);
+                }
+
+                transaction.Commit();
+            }
+            catch(Exception ex)
+            {
+                log.Error(ex);
+                transaction.Rollback();
             }
         }
 

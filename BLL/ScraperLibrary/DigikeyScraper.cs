@@ -24,22 +24,11 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private const int productSpecContentLength = 64;
         private const int descriptionLength = 64;
         private const int packingLength = 64;
+        private const string ftpServerAddress = "ftp://120.25.220.49/";
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
-        private Supplier supplier = new Supplier();
-        private XElement scrapedData = XElement.Parse(string.Format("<r name=\"{0}\" url=\"{1}\"><cats/></r>", SUPPLIERNAME, DIGIKEYHOMEURL));
-        private int partCount;
-        private List<DataTable> categoryDataTables = new List<DataTable>();
-        private DataTable productSpecDataTable = new DataTable();
-        private DataTable supplierDataTable = new DataTable(); 
-        private DataTable manufacturerDataTable = new DataTable();
         private Dictionary<string, SqlGuid> manufacturerDictionary = new Dictionary<string, SqlGuid>();
-        private DataTable productInfoDataTable = new DataTable();        
-
+        private Object obj = new Object();
         public static HtmlDocument baseHtmlDoc = new HtmlDocument();
-
-        //static Dictionary<string, Dictionary<string, string>> categoryListDict = new Dictionary<string, Dictionary<string, string>>();
-        //static Dictionary<string, IEnumerable<string>> categoryIndexListDict = new Dictionary<string, IEnumerable<string>>();
-        //static Dictionary<string, string> failDetailedLinks = new Dictionary<string, string>();
 
         public override void ScrapePage()
         {
@@ -52,36 +41,10 @@ namespace GrabbingParts.BLL.ScraperLibrary
             log.DebugFormat("GetBaseHtmlDocument finish.cost:{0}ms", sw.ElapsedMilliseconds);
 
             sw = Stopwatch.StartNew();
-            GetCategory();
-
-            sw.Stop();
-            log.DebugFormat("GetCategory finish.cost:{0}ms", sw.ElapsedMilliseconds);
-
-            sw = Stopwatch.StartNew();
-            GetSubCategoryAndWidget();
-
-            sw.Stop();
-            log.DebugFormat("GetSubCategoryAndWidget finish.cost:{0}ms", sw.ElapsedMilliseconds);
-
-            sw = Stopwatch.StartNew();
             GetPartGroup();
 
             sw.Stop();
             log.DebugFormat("GetPartGroup finish.cost:{0}ms", sw.ElapsedMilliseconds);
-
-            sw = Stopwatch.StartNew();
-            PrepareScrapedData();
-
-            sw.Stop();
-            log.DebugFormat("PrepareScrapedData finish.cost:{0}ms", sw.ElapsedMilliseconds);
-            log.DebugFormat("Part count:{0}", partCount);
-
-            InitDataTables();
-
-            PrepareDataTables();
-
-            DataCenter.ExecuteTransaction(categoryDataTables, productSpecDataTable, supplierDataTable,
-            manufacturerDataTable, productInfoDataTable);
         }
 
         private void GetBaseHtmlDocument()
@@ -90,61 +53,39 @@ namespace GrabbingParts.BLL.ScraperLibrary
         }
 
         /// <summary>
-        /// Get category
-        /// </summary>
-        private void GetCategory()
-        {
-            string xpathForCategory = "/html/body/div[@id='wrapper']/div[@id='top_categories']/a[@id='topnav-link']/table[@id='toprow']/tr/td[img]";
-            HtmlNodeCollection uiCategoryList = baseHtmlDoc.DocumentNode.SelectNodes(xpathForCategory);
-            int key = 1;
-
-            foreach (HtmlNode uiCategory in uiCategoryList)
-            {
-                supplier.Categories.Add(new Category(key.ToString(), XmlHelpers.GetText(uiCategory)));
-                key++;
-            }
-        }
-
-        /// <summary>
         /// Get sub category and widget
         /// </summary>
-        private void GetSubCategoryAndWidget()
+        private void GetSubCategoryAndWidget(Category category, string categoryIndex)
         {
-            string xpathForSubCategory = "/html/body/div[@id='wrapper']/div[@id='top_categories']/div[@id='topnav']/table[@id='bottomrow']/tr/td[a]";
-            HtmlNodeCollection uiSubCategoryList = baseHtmlDoc.DocumentNode.SelectNodes(xpathForSubCategory);
+            string xpathForSubCategory = "/html/body/div[@id='wrapper']/div[@id='top_categories']/div[@id='topnav']/table[@id='bottomrow']/tr/td[a][" + categoryIndex + "]";
+            HtmlNode uiSubCategory = baseHtmlDoc.DocumentNode.SelectSingleNode(xpathForSubCategory);
             string subCategoryId;
             string subCategoryName;
             int widgetId = 1;
             string widgetName;
             string widgetUrl;
-            int i = 0;
             HtmlNode anchorNode;
 
-            foreach (HtmlNode uiSubCategory in uiSubCategoryList)
+            HtmlNodeCollection uiAnchorList = uiSubCategory.SelectNodes("a[@id!='viewall-link']");
+            foreach (HtmlNode uiAnchor in uiAnchorList)
             {
-                HtmlNodeCollection uiAnchorList = uiSubCategory.SelectNodes("a[@id!='viewall-link']");
-                foreach (HtmlNode uiAnchor in uiAnchorList)
+                subCategoryId = uiAnchor.Attributes["id"].Value;
+                subCategoryName = XmlHelpers.GetText(uiAnchor);
+                SubCategory subCategory = new SubCategory(subCategoryId, subCategoryName);
+                HtmlNode ul = uiAnchor.NextSibling.NextSibling;
+                HtmlNodeCollection liList = ul.SelectNodes("li");
+                widgetId = 1;
+
+                foreach (HtmlNode li in liList)
                 {
-                    subCategoryId = uiAnchor.Attributes["id"].Value;
-                    subCategoryName = XmlHelpers.GetText(uiAnchor);
-                    SubCategory subCategory = new SubCategory(subCategoryId, subCategoryName);
-                    HtmlNode ul = uiAnchor.NextSibling.NextSibling;
-                    HtmlNodeCollection liList = ul.SelectNodes("li");
-                    widgetId = 1;
-
-                    foreach (HtmlNode li in liList)
-                    {
-                        anchorNode = li.SelectSingleNode("a");
-                        widgetName = XmlHelpers.GetText(anchorNode);
-                        widgetUrl = anchorNode.Attributes["href"].Value;
-                        subCategory.Widgets.Add(new Widget(widgetId.ToString(), widgetName, widgetUrl));
-                        widgetId++;
-                    }
-
-                    supplier.Categories[i].SubCategories.Add(subCategory);
+                    anchorNode = li.SelectSingleNode("a");
+                    widgetName = XmlHelpers.GetText(anchorNode);
+                    widgetUrl = anchorNode.Attributes["href"].Value;
+                    subCategory.Widgets.Add(new Widget(widgetId.ToString(), widgetName, widgetUrl));
+                    widgetId++;
                 }
 
-                i++;
+                category.SubCategories.Add(subCategory);
             }
         }
 
@@ -153,11 +94,12 @@ namespace GrabbingParts.BLL.ScraperLibrary
         /// </summary>
         private void GetPartGroup()
         {
-            Task getPartGroupForSemiconductorProducts = Task.Factory.StartNew(() => { GetPartGroupForSemiconductorProducts(); });
-            Task getPartGroupForPassiveComponents = Task.Factory.StartNew(() => { GetPartGroupForPassiveComponents(); });
-            Task getPartGroupForInterconnectProducts = Task.Factory.StartNew(() => { GetPartGroupForInterconnectProducts(); });
-            Task getPartGroupForMechanicalElectronicProducts = Task.Factory.StartNew(() => { GetPartGroupForMechanicalElectronicProducts(); });
-            Task getPartGroupForPhotoelectricElement = Task.Factory.StartNew(() => { GetPartGroupForPhotoelectricElement(); });
+            Task getPartGroupForSemiconductorProducts = Task.Factory.StartNew(() => { HandleCategory("半导体产品", "1"); });
+            Task getPartGroupForPassiveComponents = Task.Factory.StartNew(() => { HandleCategory("无源元件", "2"); });
+            Task getPartGroupForInterconnectProducts = Task.Factory.StartNew(() => { HandleCategory("互连产品", "3"); });
+            Task getPartGroupForMechanicalElectronicProducts = Task.Factory.StartNew(() => { HandleCategory("机电产品", "4"); });
+            Task getPartGroupForPhotoelectricElement = Task.Factory.StartNew(() => { HandleCategory("光电元件", "5"); });
+            Task insertDataToSupplier = Task.Factory.StartNew(() => { InsertDataToSupplier(); });
 
             Task[] taskList = { getPartGroupForSemiconductorProducts, getPartGroupForPassiveComponents, getPartGroupForInterconnectProducts,
                                 getPartGroupForMechanicalElectronicProducts, getPartGroupForPhotoelectricElement};
@@ -172,59 +114,72 @@ namespace GrabbingParts.BLL.ScraperLibrary
             }
         }
 
-        /// <summary>
-        /// 半导体产品
-        /// </summary>
-        private void GetPartGroupForSemiconductorProducts()
+        private void HandleCategory(string categoryName, string categoryIndex)
         {
-            GetPartGroupWithTask(0);
-            log.Debug("GetPartGroupForSemiconductorProducts finished.");
+            Category category = new Category(categoryIndex, categoryName);
+            
+            Stopwatch sw = Stopwatch.StartNew();
+            GetSubCategoryAndWidget(category, categoryIndex);
+
+            sw.Stop();
+            log.DebugFormat("GetSubCategoryAndWidget for category {0} finish.cost:{1}ms", categoryIndex, sw.ElapsedMilliseconds);
+
+            sw = Stopwatch.StartNew();
+            GetPartGroupWithTask(category);
+
+            sw.Stop();
+            log.DebugFormat("GetPartGroupWithTask for category {0} finish.cost:{0}ms", categoryIndex, sw.ElapsedMilliseconds);
+
+            sw = Stopwatch.StartNew();
+            XElement scrapedData = PrepareScrapedData(category);
+
+            sw.Stop();
+            log.DebugFormat("PrepareScrapedData for category {0} finish.cost:{0}ms", categoryIndex, sw.ElapsedMilliseconds);
+
+            List<DataTable> categoryDataTables = new List<DataTable>();
+            DataTable productSpecDataTable = new DataTable();
+            DataTable manufacturerDataTable = new DataTable();
+            DataTable productInfoDataTable = new DataTable();
+
+            InitDataTables(categoryDataTables, productSpecDataTable, manufacturerDataTable, productInfoDataTable);
+
+            PrepareDataTables(scrapedData, categoryDataTables, productSpecDataTable, manufacturerDataTable, productInfoDataTable);
+
+            DataCenter.ExecuteTransaction(categoryDataTables, productSpecDataTable,
+            manufacturerDataTable, productInfoDataTable);
+
+            log.DebugFormat("Task for category {0} finished.", categoryName);
         }
 
-        /// <summary>
-        /// 无源元件
-        /// </summary>
-        private void GetPartGroupForPassiveComponents()
+        private void InsertDataToSupplier()
         {
-            GetPartGroupWithTask(1);
-            log.Debug("GetPartGroupForPassiveComponents finished.");
-        }
+            Stopwatch sw = Stopwatch.StartNew();
 
-        /// <summary>
-        /// 互连产品
-        /// </summary>
-        private void GetPartGroupForInterconnectProducts()
-        {
-            GetPartGroupWithTask(2);
-            log.Debug("GetPartGroupForInterconnectProducts finished.");
-        }
+            DataTable supplierDataTable = new DataTable();
+            supplierDataTable.Columns.Add("GUID", typeof(System.Data.SqlTypes.SqlGuid));
+            supplierDataTable.Columns.Add("Supplier", typeof(string));
+            supplierDataTable.Columns.Add("WebUrl", typeof(string));
 
-        /// <summary>
-        /// 机电产品
-        /// </summary>
-        private void GetPartGroupForMechanicalElectronicProducts()
-        {
-            GetPartGroupWithTask(3);
-            log.Debug("GetPartGroupForMechanicalElectronicProducts finished.");
-        }
+            DataRow drSupplier = supplierDataTable.NewRow();
+            drSupplier["GUID"] = (SqlGuid)System.Guid.NewGuid();
+            drSupplier["Supplier"] = SUPPLIERNAME;
+            drSupplier["WebUrl"] = DIGIKEYHOMEURL;
+            supplierDataTable.Rows.Add(drSupplier);
 
-        /// <summary>
-        /// 光电元件
-        /// </summary>
-        private void GetPartGroupForPhotoelectricElement()
-        {
-            GetPartGroupWithTask(4);
-            log.Debug("GetPartGroupForPhotoelectricElement finished.");
+            DataCenter.InsertDataToSupplier(supplierDataTable);
+
+            sw.Stop();
+            log.DebugFormat("Task InsertDataToSupplier finished, cost{0}ms.", sw.ElapsedMilliseconds);
         }
 
         /// <summary>
         /// Use task in SubCategory level
         /// </summary>
-        private void GetPartGroupWithTask(int categoryIndex)
+        private void GetPartGroupWithTask(Category category)
         {
             List<Task> tasks = new List<Task>();
 
-            foreach (SubCategory subCategory in supplier.Categories[categoryIndex].SubCategories)
+            foreach (SubCategory subCategory in category.SubCategories)
             {
                 tasks.Add(Task.Factory.StartNew(() => GetPartGroupWithChildTask(subCategory)));
             }
@@ -365,6 +320,10 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     Part part = new Part(partId, manufacturer, partUrl, description, zoomImageUrl,
                         imageUrl, datasheetUrl, packing);
 
+                    Task.Factory.StartNew(() => { UpdateFileToFTP(imageUrl, partId, ".jpg"); });
+                    Task.Factory.StartNew(() => { UpdateFileToFTP(zoomImageUrl, partId, "_z.jpg"); });
+                    Task.Factory.StartNew(() => { UpdateFileToFTP(datasheetUrl, partId, ".pdf"); });
+
                     if (productSpecList != null)
                     {
                         foreach (HtmlNode node in productSpecList)
@@ -415,6 +374,11 @@ namespace GrabbingParts.BLL.ScraperLibrary
             }
         }
 
+        private void UpdateFileToFTP(string targetAddress, string partId, string fileExtension)
+        {
+            Common.Common.UpFileToFTPAndGetFileBytes(targetAddress, ftpServerAddress + partId + fileExtension);
+        }
+
         /// <summary>
         /// Add pagesize to parts url
         /// </summary>
@@ -435,72 +399,72 @@ namespace GrabbingParts.BLL.ScraperLibrary
         /// <summary>
         /// Prepare scraped data
         /// </summary>
-        private void PrepareScrapedData()
+        private XElement PrepareScrapedData(Category category)
         {
-            foreach (Category category in supplier.Categories)
-            {
-                XElement xeCategory = new XElement("cat", new XAttribute("id", category.Id),
+            XElement result = new XElement("r");
+            XElement xeCategory = new XElement("cat", new XAttribute("id", category.Id),
                                                                     new XAttribute("n", category.Name.TrimStart()),
                                                                     new XElement("subcats"));
-                scrapedData.Element("cats").Add(xeCategory);
+            result.Add(xeCategory);
 
-                foreach (SubCategory subCategory in category.SubCategories)
+            foreach (SubCategory subCategory in category.SubCategories)
+            {
+                XElement xeSubCategory = new XElement("subcat", new XAttribute("id", subCategory.Id),
+                                                                new XAttribute("n", subCategory.Name.TrimStart()),
+                                                                new XElement("wgts"));
+                xeCategory.Element("subcats").Add(xeSubCategory);
+
+                foreach (Widget widget in subCategory.Widgets)
                 {
-                    XElement xeSubCategory = new XElement("subcat", new XAttribute("id", subCategory.Id),
-                                                                    new XAttribute("n", subCategory.Name.TrimStart()),
-                                                                    new XElement("wgts"));
-                    xeCategory.Element("subcats").Add(xeSubCategory);
+                    XElement xeWidget = new XElement("wgt", new XAttribute("id", widget.Id),
+                                                            new XAttribute("n", widget.Name),
+                                                            new XElement("pgs"));
+                    xeSubCategory.Element("wgts").Add(xeWidget);
 
-                    foreach (Widget widget in subCategory.Widgets)
+                    foreach (PartGroup partGroup in widget.PartGroups)
                     {
-                        XElement xeWidget = new XElement("wgt", new XAttribute("id", widget.Id),
-                                                                new XAttribute("n", widget.Name),
-                                                                new XElement("pgs"));
-                        xeSubCategory.Element("wgts").Add(xeWidget);
+                        XElement xePartGroup = new XElement("pg", new XAttribute("id", partGroup.Id),
+                                                                  new XAttribute("n", partGroup.Name),
+                                                                  new XElement("ps"));
+                        xeWidget.Element("pgs").Add(xePartGroup);
 
-                        foreach (PartGroup partGroup in widget.PartGroups)
+                        foreach (Part part in partGroup.Parts)
                         {
-                            XElement xePartGroup = new XElement("pg", new XAttribute("id", partGroup.Id),
-                                                                      new XAttribute("n", partGroup.Name),
-                                                                      new XElement("ps"));
-                            xeWidget.Element("pgs").Add(xePartGroup);
+                            XElement xePart = new XElement("p", new XAttribute("id", part.Id),
+                                                                new XAttribute("mft", part.Manufacturer),
+                                                                new XAttribute("url", part.Url),
+                                                                new XAttribute("des", part.Description),
+                                                                new XAttribute("zoo", StringHelpers.GetLastDirectory(part.ZoomImageUrl)),
+                                                                new XAttribute("img", StringHelpers.GetLastDirectory(part.ImageUrl)),
+                                                                new XAttribute("ds", part.DatasheetUrl != "" ? (part.Id + ".pdf") : ""),
+                                                                new XAttribute("pack", part.Packing.TrimStart().TrimEnd()));
 
-                            foreach (Part part in partGroup.Parts)
+                            foreach (ProductSpecification ps in part.ProductSpecifications)
                             {
-                                XElement xePart = new XElement("p", new XAttribute("id", part.Id),
-                                                                    new XAttribute("mft", part.Manufacturer),
-                                                                    new XAttribute("url", part.Url),
-                                                                    new XAttribute("des", part.Description),
-                                                                    new XAttribute("zoo", StringHelpers.GetLastDirectory(part.ZoomImageUrl)),
-                                                                    new XAttribute("img", StringHelpers.GetLastDirectory(part.ImageUrl)),
-                                                                    new XAttribute("ds", part.DatasheetUrl != "" ? (part.Id + ".pdf") : ""),
-                                                                    new XAttribute("pack", part.Packing.TrimStart().TrimEnd()));
-                                
-                                foreach(ProductSpecification ps in part.ProductSpecifications)
-                                {
-                                    xePart.Add(new XElement("s", new XAttribute("n", ps.Name),
-                                                                 new XAttribute("v", ps.Content)));
-                                }
-
-                                //Todo: add price information to part after 2015-04-10
-                                xePartGroup.Element("ps").Add(xePart);
-                                partCount++;
+                                xePart.Add(new XElement("s", new XAttribute("n", ps.Name),
+                                                             new XAttribute("v", ps.Content)));
                             }
+
+                            //Todo: add price information to part after 2015-04-10
+                            xePartGroup.Element("ps").Add(xePart);
+                            //partCount++;
                         }
                     }
                 }
             }
+
+            return result;
         }
 
         /// <summary>
         /// Init category data tables
         /// </summary>
-        private void InitDataTables()
+        private void InitDataTables(List<DataTable> categoryDataTables, DataTable productSpecDataTable,
+            DataTable manufacturerDataTable, DataTable productInfoDataTable)
         {
             for (int i = 0; i < 4; i++)
             {
                 DataTable dt = new DataTable();
-                dt = new DataTable();
                 dt.Columns.Add("GUID", typeof(System.Data.SqlTypes.SqlGuid));
                 dt.Columns.Add("Name", typeof(string));
                 dt.Columns.Add("ParentID", typeof(string));
@@ -512,10 +476,6 @@ namespace GrabbingParts.BLL.ScraperLibrary
             productSpecDataTable.Columns.Add("PN", typeof(string));
             productSpecDataTable.Columns.Add("Name", typeof(string));
             productSpecDataTable.Columns.Add("Content", typeof(string));
-
-            supplierDataTable.Columns.Add("GUID", typeof(System.Data.SqlTypes.SqlGuid));
-            supplierDataTable.Columns.Add("Supplier", typeof(string));
-            supplierDataTable.Columns.Add("WebUrl", typeof(string));
 
             manufacturerDataTable.Columns.Add("GUID", typeof(System.Data.SqlTypes.SqlGuid));
             manufacturerDataTable.Columns.Add("Manufacturer", typeof(string));
@@ -534,53 +494,54 @@ namespace GrabbingParts.BLL.ScraperLibrary
             productInfoDataTable.Columns.Add("Image", typeof(string));
         }
 
-        private void PrepareDataTables()
+        private void PrepareDataTables(XElement scrapedData, List<DataTable> categoryDataTables, 
+            DataTable productSpecDataTable, DataTable manufacturerDataTable, DataTable productInfoDataTable)
         {
             SqlGuid guid0;
             SqlGuid guid1;
             SqlGuid guid2;
             SqlGuid guid3;
             string manufacturer;
-            string description;
-            string packing;
             SqlGuid manufacturerGuid;
 
-            foreach (XElement category in scrapedData.XPathSelectElements("cats/cat"))
+            XElement category = scrapedData.Element("cat");
+
+            guid0 = (SqlGuid)System.Guid.NewGuid();
+            AddRow(categoryDataTables[0], category, guid0, "");
+
+            foreach (XElement subCategory in category.XPathSelectElements("subcats/subcat"))
             {
-                guid0 = (SqlGuid)System.Guid.NewGuid();
-                AddRow(categoryDataTables[0], category, guid0, "");
+                guid1 = (SqlGuid)System.Guid.NewGuid();
+                AddRow(categoryDataTables[1], subCategory, guid1, guid0.ToString());
 
-                foreach(XElement subCategory in category.XPathSelectElements("subcats/subcat"))
+                foreach (XElement widget in subCategory.XPathSelectElements("wgts/wgt"))
                 {
-                    guid1 = (SqlGuid)System.Guid.NewGuid();
-                    AddRow(categoryDataTables[1], subCategory, guid1, guid0.ToString());
+                    guid2 = (SqlGuid)System.Guid.NewGuid();
+                    AddRow(categoryDataTables[2], widget, guid2, guid1.ToString());
 
-                    foreach (XElement widget in subCategory.XPathSelectElements("wgts/wgt"))
+                    foreach (XElement partGroup in widget.XPathSelectElements("pgs/pg"))
                     {
-                        guid2 = (SqlGuid)System.Guid.NewGuid();
-                        AddRow(categoryDataTables[2], widget, guid2, guid1.ToString());
-
-                        foreach (XElement partGroup in widget.XPathSelectElements("pgs/pg"))
+                        guid3 = (SqlGuid)System.Guid.NewGuid();
+                        if (XmlHelpers.GetAttribute(partGroup, "n") != "PartGroup")
                         {
-                            guid3 = (SqlGuid)System.Guid.NewGuid();
-                            if (XmlHelpers.GetAttribute(partGroup, "n") != "PartGroup")
-                            {
-                                AddRow(categoryDataTables[3], partGroup, guid3, guid2.ToString());
-                            }
+                            AddRow(categoryDataTables[3], partGroup, guid3, guid2.ToString());
+                        }
 
-                            foreach(XElement part in partGroup.XPathSelectElements("ps/p"))
+                        foreach (XElement part in partGroup.XPathSelectElements("ps/p"))
+                        {
+                            manufacturer = XmlHelpers.GetAttribute(part, "mft");
+                            if (manufacturer.Length > manufacturerLength)
                             {
-                                manufacturer = XmlHelpers.GetAttribute(part, "mft");
-                                if (manufacturer.Length > manufacturerLength)
-                                {
-                                    manufacturer = manufacturer.Substring(0, manufacturerLength);
-                                }
-                                DataRow drProductInfo = productInfoDataTable.NewRow();
-                                drProductInfo["GUID"] = (SqlGuid)System.Guid.NewGuid();
-                                drProductInfo["PN"] = XmlHelpers.GetAttribute(part, "id");
-                                drProductInfo["Manufacturer"] = manufacturer;
-                                
-                                if(!manufacturerDictionary.ContainsKey(manufacturer))
+                                manufacturer = manufacturer.Substring(0, manufacturerLength);
+                            }
+                            DataRow drProductInfo = productInfoDataTable.NewRow();
+                            drProductInfo["GUID"] = (SqlGuid)System.Guid.NewGuid();
+                            drProductInfo["PN"] = XmlHelpers.GetAttribute(part, "id");
+                            drProductInfo["Manufacturer"] = manufacturer;
+
+                            lock(obj)
+                            {
+                                if (!manufacturerDictionary.ContainsKey(manufacturer))
                                 {
                                     manufacturerGuid = (SqlGuid)System.Guid.NewGuid();
                                     manufacturerDictionary.Add(manufacturer, manufacturerGuid);
@@ -589,44 +550,38 @@ namespace GrabbingParts.BLL.ScraperLibrary
                                     drManufacturer["GUID"] = manufacturerGuid;
                                     drManufacturer["Manufacturer"] = manufacturer;
                                     manufacturerDataTable.Rows.Add(drManufacturer);
-                                    
+
                                     drProductInfo["ManufacturerID"] = manufacturerGuid;
                                 }
                                 else
                                 {
                                     drProductInfo["ManufacturerID"] = manufacturerDictionary[manufacturer];
                                 }
+                            }                            
 
-                                drProductInfo["Description"] = XmlHelpers.GetAttribute(part, "des");
-                                drProductInfo["Packing"] = XmlHelpers.GetAttribute(part, "pack");
-                                drProductInfo["Type1"] = guid0.ToString().ToUpper();
-                                drProductInfo["Type2"] = guid1.ToString().ToUpper();
-                                drProductInfo["Type3"] = guid2.ToString().ToUpper();
-                                drProductInfo["Type4"] = guid3.ToString().ToUpper();
-                                drProductInfo["Datasheets"] = XmlHelpers.GetAttribute(part, "ds");
-                                drProductInfo["Image"] = XmlHelpers.GetAttribute(part, "img");
-                                productInfoDataTable.Rows.Add(drProductInfo);
+                            drProductInfo["Description"] = XmlHelpers.GetAttribute(part, "des");
+                            drProductInfo["Packing"] = XmlHelpers.GetAttribute(part, "pack");
+                            drProductInfo["Type1"] = guid0.ToString().ToUpper();
+                            drProductInfo["Type2"] = guid1.ToString().ToUpper();
+                            drProductInfo["Type3"] = guid2.ToString().ToUpper();
+                            drProductInfo["Type4"] = guid3.ToString().ToUpper();
+                            drProductInfo["Datasheets"] = XmlHelpers.GetAttribute(part, "ds");
+                            drProductInfo["Image"] = XmlHelpers.GetAttribute(part, "img");
+                            productInfoDataTable.Rows.Add(drProductInfo);
 
-                                foreach(XElement spec in part.Elements("s"))
-                                {
-                                    DataRow dr = productSpecDataTable.NewRow();
-                                    dr["GUID"] = (SqlGuid)System.Guid.NewGuid();
-                                    dr["PN"] = XmlHelpers.GetAttribute(part, "id");
-                                    dr["Name"] = XmlHelpers.GetAttribute(spec, "n");
-                                    dr["Content"] = XmlHelpers.GetAttribute(spec, "v");
-                                    productSpecDataTable.Rows.Add(dr);
-                                }                                
+                            foreach (XElement spec in part.Elements("s"))
+                            {
+                                DataRow dr = productSpecDataTable.NewRow();
+                                dr["GUID"] = (SqlGuid)System.Guid.NewGuid();
+                                dr["PN"] = XmlHelpers.GetAttribute(part, "id");
+                                dr["Name"] = XmlHelpers.GetAttribute(spec, "n");
+                                dr["Content"] = XmlHelpers.GetAttribute(spec, "v");
+                                productSpecDataTable.Rows.Add(dr);
                             }
                         }
                     }
                 }
             }
-
-            DataRow drSupplier = supplierDataTable.NewRow();
-            drSupplier["GUID"] = (SqlGuid)System.Guid.NewGuid();
-            drSupplier["Supplier"] = SUPPLIERNAME;
-            drSupplier["WebUrl"] = DIGIKEYHOMEURL;
-            supplierDataTable.Rows.Add(drSupplier);
         }
 
         private void AddRow(DataTable dt, XElement type, SqlGuid currentGuid, string parentId)
