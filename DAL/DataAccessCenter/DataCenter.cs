@@ -12,51 +12,40 @@ namespace GrabbingParts.DAL.DataAccessCenter
     {
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
         private static string connectionString = ConfigurationManager.ConnectionStrings["WXH"].ToString();
+        private static Object obj = new Object();
 
         public static void ExecuteTransaction(List<DataTable> categoryDataTables, DataTable productSpecDataTable,
             DataTable manufacturerDataTable, DataTable productInfoDataTable)
         {
-            SqlConnection conn = new SqlConnection(connectionString);
-            conn.Open();
-            SqlCommand command = conn.CreateCommand();
-
-            SqlTransaction transaction = null;
-            transaction = conn.BeginTransaction();
-            command.Connection = conn;
-            command.Transaction = transaction;
-
-            try
+            lock(obj)
             {
-                /*command.CommandText = "DELETE FROM dbo.[产品分类]";
-                command.ExecuteNonQuery();
+                SqlConnection conn = new SqlConnection(connectionString);
+                conn.Open();
+                SqlCommand command = conn.CreateCommand();
 
-                command.CommandText = "DELETE FROM dbo.[产品规格]";
-                command.ExecuteNonQuery();
+                SqlTransaction transaction = null;
+                transaction = conn.BeginTransaction();
+                command.Connection = conn;
+                command.Transaction = transaction;
 
-                command.CommandText = "DELETE FROM dbo.[产品资料]";
-                command.ExecuteNonQuery();
-
-                command.CommandText = "DELETE FROM dbo.[厂家资料]";
-                command.ExecuteNonQuery();
-
-                command.CommandText = "DELETE FROM dbo.[供应商资料]";
-                command.ExecuteNonQuery();*/
-
-                for (int i = 0; i < 4; i++)
+                try
                 {
-                    InsertDataToCategory(conn, transaction, categoryDataTables[i]);
+                    for (int i = 0; i < 4; i++)
+                    {
+                        InsertDataToCategory(conn, transaction, categoryDataTables[i]);
+                    }
+
+                    InsertDataToProductSpecTable(conn, transaction, productSpecDataTable);
+                    InsertDataToManufacturer(conn, transaction, manufacturerDataTable);
+                    InsertDataToProductInfo(conn, transaction, productInfoDataTable);
+
+                    transaction.Commit();
                 }
-
-                InsertDataToProductSpecTable(conn, transaction, productSpecDataTable);
-                InsertDataToManufacturer(conn, transaction, manufacturerDataTable);
-                InsertDataToProductInfo(conn, transaction, productInfoDataTable);
-
-                transaction.Commit();
-            }
-            catch(Exception ex)
-            {
-                log.Error(ex);
-                transaction.Rollback();
+                catch (Exception ex)
+                {
+                    log.Error(ex);
+                    transaction.Rollback();
+                }
             }
         }
 
