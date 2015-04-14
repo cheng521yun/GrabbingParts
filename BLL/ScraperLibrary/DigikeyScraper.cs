@@ -24,10 +24,12 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private const int productSpecContentLength = 64;
         private const int descriptionLength = 64;
         private const int packingLength = 64;
+        private static int partCount = 0;
         private const string ftpServerAddress = "ftp://120.25.220.49/";
-        private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly log4net.ILog log = log4net.LogManager.GetLogger("WXH");
         private Dictionary<string, SqlGuid> manufacturerDictionary = new Dictionary<string, SqlGuid>();
         private Object obj = new Object();
+        private Object obj2 = new Object();
         public static HtmlDocument baseHtmlDoc = new HtmlDocument();
 
         public override void ScrapePage()
@@ -45,6 +47,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
             sw.Stop();
             log.DebugFormat("GetPartGroup finish.cost:{0}ms", sw.ElapsedMilliseconds);
+            log.Warn("PartCount: " + partCount.ToString());
         }
 
         private void GetBaseHtmlDocument()
@@ -113,6 +116,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
             }
             catch (AggregateException ae)
             {
+                log.Warn("PartCount: " + partCount.ToString());
                 throw ae.Flatten();
             }
         }
@@ -251,6 +255,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     }           
                 }                
             }
+            log.Warn("PartCount: " + partCount.ToString());
         }
 
         private void AddParts(PartGroup partGroup, string partsUrl, int currentPage = 1)
@@ -313,9 +318,9 @@ namespace GrabbingParts.BLL.ScraperLibrary
                         Part part = new Part(partId, manufacturer, partUrl, description, zoomImageUrl,
                             imageUrl, datasheetUrl, packing);
 
-                        UpdateFileToFTP(imageUrl, partId, ".jpg");
-                        UpdateFileToFTP(zoomImageUrl, partId, "_z.jpg");
-                        UpdateFileToFTP(datasheetUrl, partId, ".pdf");
+                        //UpdateFileToFTP(imageUrl, partId, ".jpg");
+                        //UpdateFileToFTP(zoomImageUrl, partId, "_z.jpg");
+                        //UpdateFileToFTP(datasheetUrl, partId, ".pdf");
 
                         if (productSpecList != null)
                         {
@@ -338,6 +343,12 @@ namespace GrabbingParts.BLL.ScraperLibrary
                         //Todo: add price information to part after 2015-04-10
 
                         partGroup.Parts.Add(part);
+
+                        lock(obj2)
+                        {
+                            partCount++;
+                            log.Debug("PartCount: " + partCount.ToString());
+                        }
                     }
 
                     HtmlNode currentPageNode = partsHtmlDoc.DocumentNode.SelectSingleNode(currentPageXpath);
@@ -444,7 +455,6 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
                             //Todo: add price information to part after 2015-04-10
                             xePartGroup.Element("ps").Add(xePart);
-                            //partCount++;
                         }
                     }
                 }

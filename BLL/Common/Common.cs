@@ -8,18 +8,18 @@ namespace GrabbingParts.BLL.Common
 {
     public static class Common
     {
-        private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly log4net.ILog log = log4net.LogManager.GetLogger("WXH");
 
         public static HtmlDocument RetryRequest(string url)
         {
             try
             {
                 HtmlWeb htmlWeb = new HtmlWeb();
-                return Retry.Do(() => htmlWeb.Load(url), TimeSpan.FromSeconds(20));
+                return Retry.Do(() => htmlWeb.Load(url), TimeSpan.FromSeconds(60));
             }
             catch (Exception ex)
             {
-                log.Error(ex);
+                log.Error("Error for the url: " + url);
                 return null;
             }
         }

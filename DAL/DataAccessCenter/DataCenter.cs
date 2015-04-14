@@ -10,7 +10,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
 {
     public static class DataCenter
     {
-        private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+        private static readonly log4net.ILog log = log4net.LogManager.GetLogger("WXH");
         private static string connectionString = ConfigurationManager.ConnectionStrings["WXH"].ToString();
         private static Object obj = new Object();
 
