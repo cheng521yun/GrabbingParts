@@ -73,17 +73,20 @@ namespace GrabbingParts.BLL.ScraperLibrary
                 subCategoryName = XmlHelpers.GetText(uiAnchor);
                 SubCategory subCategory = new SubCategory(subCategoryId, subCategoryName);
                 HtmlNode ul = uiAnchor.NextSibling.NextSibling;
-                HtmlNodeCollection liList = ul.SelectNodes("li");
+                HtmlNodeCollection liList = ul != null ? ul.SelectNodes("li") : null;
                 widgetId = 1;
 
-                foreach (HtmlNode li in liList)
+                if (liList != null)
                 {
-                    anchorNode = li.SelectSingleNode("a");
-                    widgetName = XmlHelpers.GetText(anchorNode);
-                    widgetUrl = XmlHelpers.GetAttribute(anchorNode, "href");
-                    subCategory.Widgets.Add(new Widget(widgetId.ToString(), widgetName, widgetUrl));
-                    widgetId++;
-                }
+                    foreach (HtmlNode li in liList)
+                    {
+                        anchorNode = li.SelectSingleNode("a");
+                        widgetName = XmlHelpers.GetText(anchorNode);
+                        widgetUrl = XmlHelpers.GetAttribute(anchorNode, "href");
+                        subCategory.Widgets.Add(new Widget(widgetId.ToString(), widgetName, widgetUrl));
+                        widgetId++;
+                    }
+                }                
 
                 category.SubCategories.Add(subCategory);
             }
@@ -102,7 +105,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
             Task insertDataToSupplier = Task.Factory.StartNew(() => { InsertDataToSupplier(); });
 
             Task[] taskList = { getPartGroupForSemiconductorProducts, getPartGroupForPassiveComponents, getPartGroupForInterconnectProducts,
-                                getPartGroupForMechanicalElectronicProducts, getPartGroupForPhotoelectricElement};
+                                getPartGroupForMechanicalElectronicProducts, getPartGroupForPhotoelectricElement, insertDataToSupplier};
 
             try
             {
@@ -245,7 +248,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                             widget.PartGroups.Add(partGroup);
                             partGroupId++;
                         }
-                    }                    
+                    }           
                 }                
             }
         }

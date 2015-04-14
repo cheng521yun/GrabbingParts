@@ -330,6 +330,8 @@ namespace GrabbingParts.Util.XmlHelpers
         /// <summary>
         /// Get text from an attribute of a HtmlNode.
         /// </summary>
+        /// <param name="node">Node to query.</param>
+        /// <param name="attribName">name of the attribute.</param>
         /// <returns>Node value or blank if not found.</returns>
         public static string GetAttribute(HtmlNode node, string attribName)
         {
