@@ -326,6 +326,20 @@ namespace GrabbingParts.Util.XmlHelpers
             XAttribute attr = elem.Attribute(attribName);
             return attr != null ? attr.Value : "";
         }
+
+        /// <summary>
+        /// Get text from an attribute of a HtmlNode.
+        /// </summary>
+        /// <returns>Node value or blank if not found.</returns>
+        public static string GetAttribute(HtmlNode node, string attribName)
+        {
+            if (node == null)
+            {
+                return "";
+            }
+            HtmlAttribute attr = node.Attributes[attribName];
+            return attr != null ? attr.Value : "";
+        }
         
         /// <summary>
         /// Get text from an XElement

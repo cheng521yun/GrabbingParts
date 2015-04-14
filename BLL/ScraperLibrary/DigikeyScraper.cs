@@ -69,7 +69,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
             HtmlNodeCollection uiAnchorList = uiSubCategory.SelectNodes("a[@id!='viewall-link']");
             foreach (HtmlNode uiAnchor in uiAnchorList)
             {
-                subCategoryId = uiAnchor.Attributes["id"].Value;
+                subCategoryId = XmlHelpers.GetAttribute(uiAnchor, "id");
                 subCategoryName = XmlHelpers.GetText(uiAnchor);
                 SubCategory subCategory = new SubCategory(subCategoryId, subCategoryName);
                 HtmlNode ul = uiAnchor.NextSibling.NextSibling;
@@ -80,7 +80,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
                 {
                     anchorNode = li.SelectSingleNode("a");
                     widgetName = XmlHelpers.GetText(anchorNode);
-                    widgetUrl = anchorNode.Attributes["href"].Value;
+                    widgetUrl = XmlHelpers.GetAttribute(anchorNode, "href");
                     subCategory.Widgets.Add(new Widget(widgetId.ToString(), widgetName, widgetUrl));
                     widgetId++;
                 }
@@ -225,22 +225,28 @@ namespace GrabbingParts.BLL.ScraperLibrary
             else
             {
                 HtmlDocument widgetHtmlDoc = Common.Common.RetryRequest(widget.Url);
-                HtmlNodeCollection liList = widgetHtmlDoc.DocumentNode.SelectNodes(partGroupXpath);
-                int partGroupId = 1;
-
-                foreach (HtmlNode li in liList)
+                if(widgetHtmlDoc != null)
                 {
-                    anchorNode = li.SelectSingleNode("a");
-                    partGroupName = XmlHelpers.GetText(anchorNode);
-                    partsUrl = DIGIKEYHOMEURL + anchorNode.Attributes["href"].Value;
+                    HtmlNodeCollection liList = widgetHtmlDoc.DocumentNode.SelectNodes(partGroupXpath);
+                    if(liList != null)
+                    {
+                        int partGroupId = 1;
 
-                    PartGroup partGroup = new PartGroup(partGroupId.ToString(), partGroupName, partsUrl);
+                        foreach (HtmlNode li in liList)
+                        {
+                            anchorNode = li.SelectSingleNode("a");
+                            partGroupName = XmlHelpers.GetText(anchorNode);
+                            partsUrl = DIGIKEYHOMEURL + XmlHelpers.GetAttribute(anchorNode, "href");
 
-                    AddParts(partGroup, partsUrl);
+                            PartGroup partGroup = new PartGroup(partGroupId.ToString(), partGroupName, partsUrl);
 
-                    widget.PartGroups.Add(partGroup);
-                    partGroupId++;
-                }
+                            AddParts(partGroup, partsUrl);
+
+                            widget.PartGroups.Add(partGroup);
+                            partGroupId++;
+                        }
+                    }                    
+                }                
             }
         }
 
@@ -258,125 +264,113 @@ namespace GrabbingParts.BLL.ScraperLibrary
             string zoomImageUrl;
             string imageUrl;
             string datasheetUrl;
-            HtmlAttribute zoomImageNode;
             string packing;
             string productSpecName;
             string productSpecContent;
 
             HtmlDocument partsHtmlDoc = Common.Common.RetryRequest(AddPageSizeToPartsUrl(partsUrl));
-            HtmlNodeCollection trList = partsHtmlDoc.DocumentNode.SelectNodes(partXpath);
-
-            if (trList != null)
+            if(partsHtmlDoc != null)
             {
-                foreach (HtmlNode tr in trList)
+                HtmlNodeCollection trList = partsHtmlDoc.DocumentNode.SelectNodes(partXpath);
+
+                if (trList != null)
                 {
-                    partId = XmlHelpers.GetText(tr, "td[@class='mfg-partnumber']/a/span");
-                    partUrl = DIGIKEYHOMEURL + tr.SelectSingleNode("td[@class='mfg-partnumber']/a").Attributes["href"].Value;
-                    manufacturer = XmlHelpers.GetText(tr, "td[@class='vendor']/span//span");
-                    description = XmlHelpers.GetText(tr, "td[@class='description']");
-                    if (description.Length > descriptionLength)
+                    foreach (HtmlNode tr in trList)
                     {
-                        description = description.Substring(0, descriptionLength);
-                    }
-
-                    zoomImageNode = tr.SelectSingleNode("td[@class='image']/a/img").Attributes["zoomimg"];
-                    if (zoomImageNode != null)
-                    {
-                        zoomImageUrl = zoomImageNode.Value;
-                    }
-                    else
-                    {
-                        zoomImageUrl = "";
-                    }
-
-                    imageUrl = tr.SelectSingleNode("td[@class='image']/a/img").Attributes["src"].Value;
-
-                    if (tr.SelectSingleNode("td[@class='rd-datasheet']/center/a") != null)
-                    {
-                        datasheetUrl = tr.SelectSingleNode("td[@class='rd-datasheet']/center/a").Attributes["href"].Value;
-                    }
-                    else
-                    {
-                        datasheetUrl = "";
-                    }
-
-                    HtmlDocument partHtmlDoc = Common.Common.RetryRequest(partUrl);
-                    HtmlNodeCollection productSpecList = null;
-
-                    if (partHtmlDoc != null)
-                    {
-                        packing = XmlHelpers.GetText(partHtmlDoc.DocumentNode, partDetailXpath);
-                        productSpecList = partHtmlDoc.DocumentNode.SelectNodes(productSpecXpath);
-                        if(packing.Length > packingLength)
+                        partId = XmlHelpers.GetText(tr, "td[@class='mfg-partnumber']/a/span");
+                        partUrl = DIGIKEYHOMEURL + XmlHelpers.GetAttribute(tr.SelectSingleNode("td[@class='mfg-partnumber']/a"), "href");
+                        manufacturer = XmlHelpers.GetText(tr, "td[@class='vendor']/span//span");
+                        description = XmlHelpers.GetText(tr, "td[@class='description']");
+                        if (description.Length > descriptionLength)
                         {
-                            packing = packing.Substring(0, packingLength);
+                            description = description.Substring(0, descriptionLength);
                         }
-                    }
-                    else
-                    {
-                        packing = "";
-                    }
 
-                    Part part = new Part(partId, manufacturer, partUrl, description, zoomImageUrl,
-                        imageUrl, datasheetUrl, packing);
+                        zoomImageUrl = XmlHelpers.GetAttribute(tr.SelectSingleNode("td[@class='image']/a/img"), "zoomimg");
+                        imageUrl = XmlHelpers.GetAttribute(tr.SelectSingleNode("td[@class='image']/a/img"), "src");
+                        datasheetUrl = XmlHelpers.GetAttribute(tr.SelectSingleNode("td[@class='rd-datasheet']/center/a"), "href");
 
-                    Task.Factory.StartNew(() => { UpdateFileToFTP(imageUrl, partId, ".jpg"); });
-                    Task.Factory.StartNew(() => { UpdateFileToFTP(zoomImageUrl, partId, "_z.jpg"); });
-                    Task.Factory.StartNew(() => { UpdateFileToFTP(datasheetUrl, partId, ".pdf"); });
+                        HtmlDocument partHtmlDoc = Common.Common.RetryRequest(partUrl);
+                        HtmlNodeCollection productSpecList = null;
 
-                    if (productSpecList != null)
-                    {
-                        foreach (HtmlNode node in productSpecList)
+                        if (partHtmlDoc != null)
                         {
-                            productSpecName = XmlHelpers.GetText(node, "th");
-                            productSpecContent = XmlHelpers.GetText(node, "td");
-
-                            if (!productSpecName.Contains(BAOZHUANG))
+                            packing = XmlHelpers.GetText(partHtmlDoc.DocumentNode, partDetailXpath);
+                            productSpecList = partHtmlDoc.DocumentNode.SelectNodes(productSpecXpath);
+                            if (packing.Length > packingLength)
                             {
-                                if (productSpecContent.Length > productSpecContentLength)
-                                {
-                                    productSpecContent = productSpecContent.Substring(0, productSpecContentLength);
-                                }
-                                part.ProductSpecifications.Add(new ProductSpecification(productSpecName, productSpecContent));
+                                packing = packing.Substring(0, packingLength);
                             }
                         }
+                        else
+                        {
+                            packing = "";
+                        }
+
+                        Part part = new Part(partId, manufacturer, partUrl, description, zoomImageUrl,
+                            imageUrl, datasheetUrl, packing);
+
+                        UpdateFileToFTP(imageUrl, partId, ".jpg");
+                        UpdateFileToFTP(zoomImageUrl, partId, "_z.jpg");
+                        UpdateFileToFTP(datasheetUrl, partId, ".pdf");
+
+                        if (productSpecList != null)
+                        {
+                            foreach (HtmlNode node in productSpecList)
+                            {
+                                productSpecName = XmlHelpers.GetText(node, "th");
+                                productSpecContent = XmlHelpers.GetText(node, "td");
+
+                                if (!productSpecName.Contains(BAOZHUANG))
+                                {
+                                    if (productSpecContent.Length > productSpecContentLength)
+                                    {
+                                        productSpecContent = productSpecContent.Substring(0, productSpecContentLength);
+                                    }
+                                    part.ProductSpecifications.Add(new ProductSpecification(productSpecName, productSpecContent));
+                                }
+                            }
+                        }
+
+                        //Todo: add price information to part after 2015-04-10
+
+                        partGroup.Parts.Add(part);
                     }
 
-                    //Todo: add price information to part after 2015-04-10
+                    HtmlNode currentPageNode = partsHtmlDoc.DocumentNode.SelectSingleNode(currentPageXpath);
+                    string currentPageValue = XmlHelpers.GetText(currentPageNode);
+                    string tmpTotalPage = StringHelpers.GetLastDirectory(currentPageValue);
+                    int totalPage = 0;
+                    Int32.TryParse(tmpTotalPage, out totalPage);
 
-                    partGroup.Parts.Add(part);
+                    if (totalPage > currentPage)
+                    {
+                        int nextPage = currentPage + 1;
+                        string nextPageUrl;
+                        if (partsUrl.IndexOf("/page/") > 0)
+                        {
+                            nextPageUrl = partsUrl.Replace("/page/" + currentPage.ToString(), "/page/" + nextPage.ToString());
+                        }
+                        else
+                        {
+                            nextPageUrl = partsUrl + "/page/" + nextPage.ToString();
+                        }
+                        AddParts(partGroup, nextPageUrl, nextPage);
+                    }
                 }
-
-                HtmlNode currentPageNode = partsHtmlDoc.DocumentNode.SelectSingleNode(currentPageXpath);
-                string currentPageValue = XmlHelpers.GetText(currentPageNode);
-                string tmpTotalPage = StringHelpers.GetLastDirectory(currentPageValue);
-                int totalPage = 0;
-                Int32.TryParse(tmpTotalPage, out totalPage);
-                
-                if(totalPage > currentPage)
+                else
                 {
-                    int nextPage = currentPage + 1;
-                    string nextPageUrl;
-                    if (partsUrl.IndexOf("/page/") > 0)
-                    {
-                        nextPageUrl = partsUrl.Replace("/page/" + currentPage.ToString(), "/page/" + nextPage.ToString());
-                    }
-                    else
-                    {
-                        nextPageUrl = partsUrl + "/page/" + nextPage.ToString();
-                    }
-                    AddParts(partGroup, nextPageUrl, nextPage);
+                    //Todo: add the partGroupUrl to log file
                 }
-            }
-            else
-            {
-                //Todo: add the partGroupUrl to log file
-            }
+            }            
         }
 
         private void UpdateFileToFTP(string targetAddress, string partId, string fileExtension)
         {
-            Common.Common.UpFileToFTPAndGetFileBytes(targetAddress, ftpServerAddress + partId + fileExtension);
+            if (targetAddress != "")
+            {
+                Task.Factory.StartNew(() => { Common.Common.UpFileToFTPAndGetFileBytes(targetAddress, ftpServerAddress + partId + fileExtension); });
+            }
         }
 
         /// <summary>

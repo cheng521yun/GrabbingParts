@@ -3,10 +3,13 @@ using HtmlAgilityPack;
 using System.Net;
 using System.IO;
 
+[assembly: log4net.Config.XmlConfigurator(Watch = true)]
 namespace GrabbingParts.BLL.Common
 {
     public static class Common
     {
+        private static readonly log4net.ILog log = log4net.LogManager.GetLogger(System.Reflection.MethodBase.GetCurrentMethod().DeclaringType);
+
         public static HtmlDocument RetryRequest(string url)
         {
             try
@@ -16,7 +19,7 @@ namespace GrabbingParts.BLL.Common
             }
             catch (Exception ex)
             {
-                //Todo: add log using log4net
+                log.Error(ex);
                 return null;
             }
         }
@@ -65,11 +68,10 @@ namespace GrabbingParts.BLL.Common
                 str.Close();
                 stream.Close();
                 stream.Dispose();
-                //return mbyte;
             }
             catch (WebException exp)
             {
-                //return null;
+                log.Error(exp);
             }
         }
     }
