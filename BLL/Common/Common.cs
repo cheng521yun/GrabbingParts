@@ -19,7 +19,7 @@ namespace GrabbingParts.BLL.Common
             }
             catch (Exception ex)
             {
-                log.Error("Error for the url: " + url);
+                log.Error("Error in RetryRequest, url: " + url, ex);
                 return null;
             }
         }

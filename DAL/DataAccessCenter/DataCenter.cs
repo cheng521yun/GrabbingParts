@@ -14,7 +14,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
         private static string connectionString = ConfigurationManager.ConnectionStrings["WXH"].ToString();
         private static Object obj = new Object();
 
-        public static void ExecuteTransaction(List<DataTable> categoryDataTables, DataTable productSpecDataTable,
+        public static void ExecuteTransaction(DataTable productSpecDataTable,
             DataTable manufacturerDataTable, DataTable productInfoDataTable)
         {
             lock(obj)
@@ -30,12 +30,6 @@ namespace GrabbingParts.DAL.DataAccessCenter
 
                 try
                 {
-                    for (int i = 0; i < 4; i++)
-                    {
-                        log.InfoFormat("插入第{0}层[产品分类]记录数: {1}", i, categoryDataTables[i].Rows.Count);
-                        InsertDataToCategory(conn, transaction, categoryDataTables[i]);
-                    }
-
                     log.InfoFormat("插入[产品规格]记录数: {0}", productSpecDataTable.Rows.Count);
                     InsertDataToProductSpecTable(conn, transaction, productSpecDataTable);
 
@@ -55,7 +49,35 @@ namespace GrabbingParts.DAL.DataAccessCenter
             }
         }
 
-        public static void InsertDataToCategory(SqlConnection conn, SqlTransaction transaction, DataTable dt)
+        public static void InsertDataToCategory(List<DataTable> categoryDataTables)
+        {
+            SqlConnection conn = new SqlConnection(connectionString);
+            conn.Open();
+            SqlCommand command = conn.CreateCommand();
+
+            SqlTransaction transaction = null;
+            transaction = conn.BeginTransaction();
+            command.Connection = conn;
+            command.Transaction = transaction;
+
+            try
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    log.InfoFormat("插入第{0}层[产品分类]记录数: {1}", i, categoryDataTables[i].Rows.Count);
+                    InsertDataForEachCategory(conn, transaction, categoryDataTables[i]);
+                }
+
+                transaction.Commit();
+            }
+            catch (Exception ex)
+            {
+                log.Error(ex);
+                transaction.Rollback();
+            }
+        }
+
+        private static void InsertDataForEachCategory(SqlConnection conn, SqlTransaction transaction, DataTable dt)
         {
             using (SqlBulkCopy bulkCopy = new SqlBulkCopy(conn, SqlBulkCopyOptions.Default, transaction))
             {
