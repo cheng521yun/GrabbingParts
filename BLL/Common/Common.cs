@@ -71,7 +71,8 @@ namespace GrabbingParts.BLL.Common
             }
             catch (WebException exp)
             {
-                log.Error(exp);
+                //log.Error(exp);
+                log.InfoFormat("Error in UpFileToFTPAndGetFileBytes: {0}, {1}", targetAddress, ftpServerAddress);
             }
         }
     }

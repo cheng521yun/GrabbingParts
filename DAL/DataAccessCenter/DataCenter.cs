@@ -32,11 +32,17 @@ namespace GrabbingParts.DAL.DataAccessCenter
                 {
                     for (int i = 0; i < 4; i++)
                     {
+                        log.InfoFormat("插入第{0}层[产品分类]记录数: {1}", i, categoryDataTables[i].Rows.Count);
                         InsertDataToCategory(conn, transaction, categoryDataTables[i]);
                     }
 
+                    log.InfoFormat("插入[产品规格]记录数: {0}", productSpecDataTable.Rows.Count);
                     InsertDataToProductSpecTable(conn, transaction, productSpecDataTable);
+
+                    log.InfoFormat("插入[厂家资料]记录数: {0}", manufacturerDataTable.Rows.Count);
                     InsertDataToManufacturer(conn, transaction, manufacturerDataTable);
+
+                    log.InfoFormat("插入[产品资料]记录数: {0}", productInfoDataTable.Rows.Count);
                     InsertDataToProductInfo(conn, transaction, productInfoDataTable);
 
                     transaction.Commit();
@@ -66,7 +72,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
 
                 bulkCopy.WriteToServer(dt);//将数据源数据写入到目标表中
 
-                log.DebugFormat("插入数据所用时间:{0}ms", stopwatch.ElapsedMilliseconds);
+                log.InfoFormat("插入数据所用时间:{0}ms", stopwatch.ElapsedMilliseconds);
             }
         }
 
@@ -86,7 +92,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
 
                 bulkCopy.WriteToServer(dt);//将数据源数据写入到目标表中
 
-                log.DebugFormat("插入[产品规格]数据所用时间:{0}ms", stopwatch.ElapsedMilliseconds);
+                log.InfoFormat("插入[产品规格]数据所用时间:{0}ms", stopwatch.ElapsedMilliseconds);
             }
         }
 
@@ -116,7 +122,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
 
                     bulkCopy.WriteToServer(dt);//将数据源数据写入到目标表中
 
-                    log.DebugFormat("插入[供应商资料]数据所用时间:{0}ms", stopwatch.ElapsedMilliseconds);
+                    log.InfoFormat("插入[供应商资料]数据所用时间:{0}ms", stopwatch.ElapsedMilliseconds);
                 }
 
                 transaction.Commit();
@@ -142,7 +148,7 @@ namespace GrabbingParts.DAL.DataAccessCenter
 
                 bulkCopy.WriteToServer(dt);//将数据源数据写入到目标表中
 
-                log.DebugFormat("插入[厂家资料]数据所用时间:{0}ms", stopwatch.ElapsedMilliseconds);
+                log.InfoFormat("插入[厂家资料]数据所用时间:{0}ms", stopwatch.ElapsedMilliseconds);
             }
         }
 
@@ -169,8 +175,8 @@ namespace GrabbingParts.DAL.DataAccessCenter
                 stopwatch.Start();//跑表开始
 
                 bulkCopy.WriteToServer(dt);//将数据源数据写入到目标表中
-
-                log.DebugFormat("插入[厂家资料]数据所用时间:{0}ms", stopwatch.ElapsedMilliseconds);
+                
+                log.InfoFormat("插入[产品资料]数据所用时间:{0}ms", stopwatch.ElapsedMilliseconds);
             }
         }
     }

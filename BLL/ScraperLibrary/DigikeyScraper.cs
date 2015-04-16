@@ -20,10 +20,8 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private const string SUPPLIERNAME = "digikey";
         private const string DIGIKEYHOMEURL = "http://www.digikey.cn";
         private const string BAOZHUANG = "包装";
-        private const int manufacturerLength = 32;
-        private const int productSpecContentLength = 64;
-        private const int descriptionLength = 64;
-        private const int packingLength = 64;
+        private const string XIANGGUANCHANPIN = "相关产品";
+        private const int productSpecContentLength = 64;        
         private const string ftpServerAddress = "ftp://120.25.220.49/";
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger("WXH");
         private Dictionary<string, SqlGuid> manufacturerDictionary = new Dictionary<string, SqlGuid>();
@@ -38,13 +36,16 @@ namespace GrabbingParts.BLL.ScraperLibrary
             GetBaseHtmlDocument();
 
             sw.Stop();
-            log.DebugFormat("GetBaseHtmlDocument finish.cost:{0}ms", sw.ElapsedMilliseconds);
+            log.InfoFormat("GetBaseHtmlDocument finish.cost:{0}ms", sw.ElapsedMilliseconds);
 
             sw = Stopwatch.StartNew();
-            GetPartGroup();
+            //GetPartGroup();
+
+            InsertDataToSupplier();
+            HandleCategory("半导体产品", "1");
 
             sw.Stop();
-            log.DebugFormat("GetPartGroup finish.cost:{0}ms", sw.ElapsedMilliseconds);
+            log.InfoFormat("GetPartGroup finish.cost:{0}ms", sw.ElapsedMilliseconds);
         }
 
         private void GetBaseHtmlDocument()
@@ -126,19 +127,21 @@ namespace GrabbingParts.BLL.ScraperLibrary
             GetSubCategoryAndWidget(category, categoryIndex);
 
             sw.Stop();
-            log.DebugFormat("GetSubCategoryAndWidget for category {0} finish.cost:{1}ms", categoryIndex, sw.ElapsedMilliseconds);
+            log.InfoFormat("GetSubCategoryAndWidget for category {0} finish.cost:{1}ms", categoryName, sw.ElapsedMilliseconds);
 
             sw = Stopwatch.StartNew();
             GetPartGroupWithTask(category);
 
             sw.Stop();
-            log.DebugFormat("GetPartGroupWithTask for category {0} finish.cost:{0}ms", categoryIndex, sw.ElapsedMilliseconds);
+            log.InfoFormat("GetPartGroupWithTask for category {0} finish.cost:{0}ms", categoryIndex, sw.ElapsedMilliseconds);
 
             sw = Stopwatch.StartNew();
             XElement scrapedData = PrepareScrapedData(category);
 
             sw.Stop();
-            log.DebugFormat("PrepareScrapedData for category {0} finish.cost:{0}ms", categoryIndex, sw.ElapsedMilliseconds);
+            log.InfoFormat("PrepareScrapedData for category {0} finish.cost:{0}ms", categoryIndex, sw.ElapsedMilliseconds);
+
+            SaveScrapedData(scrapedData, categoryIndex);
 
             List<DataTable> categoryDataTables = new List<DataTable>();
             DataTable productSpecDataTable = new DataTable();
@@ -152,7 +155,22 @@ namespace GrabbingParts.BLL.ScraperLibrary
             DataCenter.ExecuteTransaction(categoryDataTables, productSpecDataTable,
             manufacturerDataTable, productInfoDataTable);
 
-            log.DebugFormat("Task for category {0} finished.", categoryName);
+            log.InfoFormat("Task for category {0} finished.", categoryName);
+        }
+
+        private void SaveScrapedData(XElement scrapedData, string categoryIndex)
+        {
+            try
+            {
+                //Todo: remove no-used data
+
+                string fileName = string.Format("Category_{0}", categoryIndex);
+                scrapedData.Save(@"c:\" + fileName);
+            }
+            catch(Exception ex)
+            {
+                log.Error("Error in SaveScrapedData", ex);
+            }
         }
 
         private void InsertDataToSupplier()
@@ -173,7 +191,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
             DataCenter.InsertDataToSupplier(supplierDataTable);
 
             sw.Stop();
-            log.DebugFormat("Task InsertDataToSupplier finished, cost{0}ms.", sw.ElapsedMilliseconds);
+            log.InfoFormat("Task InsertDataToSupplier finished, cost{0}ms.", sw.ElapsedMilliseconds);
         }
 
         /// <summary>
@@ -285,11 +303,6 @@ namespace GrabbingParts.BLL.ScraperLibrary
                         partUrl = DIGIKEYHOMEURL + XmlHelpers.GetAttribute(tr.SelectSingleNode("td[@class='mfg-partnumber']/a"), "href");
                         manufacturer = XmlHelpers.GetText(tr, "td[@class='vendor']/span//span");
                         description = XmlHelpers.GetText(tr, "td[@class='description']");
-                        if (description.Length > descriptionLength)
-                        {
-                            description = description.Substring(0, descriptionLength);
-                        }
-
                         zoomImageUrl = XmlHelpers.GetAttribute(tr.SelectSingleNode("td[@class='image']/a/img"), "zoomimg");
                         imageUrl = XmlHelpers.GetAttribute(tr.SelectSingleNode("td[@class='image']/a/img"), "src");
                         datasheetUrl = XmlHelpers.GetAttribute(tr.SelectSingleNode("td[@class='rd-datasheet']/center/a"), "href");
@@ -300,45 +313,46 @@ namespace GrabbingParts.BLL.ScraperLibrary
                         if (partHtmlDoc != null)
                         {
                             packing = XmlHelpers.GetText(partHtmlDoc.DocumentNode, partDetailXpath);
-                            productSpecList = partHtmlDoc.DocumentNode.SelectNodes(productSpecXpath);
-                            if (packing.Length > packingLength)
-                            {
-                                packing = packing.Substring(0, packingLength);
-                            }
+                            productSpecList = partHtmlDoc.DocumentNode.SelectNodes(productSpecXpath);                            
                         }
                         else
                         {
                             packing = "";
                         }
 
-                        Part part = new Part(partId, manufacturer, partUrl, description, zoomImageUrl,
+                        if(partId != "" && manufacturer != "")
+                        {
+                            CheckFieldLength(ref partId, ref manufacturer, ref description, ref packing);
+
+                            Part part = new Part(partId, manufacturer, partUrl, description, zoomImageUrl,
                             imageUrl, datasheetUrl, packing);
 
-                        //UpdateFileToFTP(imageUrl, partId, ".jpg");
-                        //UpdateFileToFTP(zoomImageUrl, partId, "_z.jpg");
-                        //UpdateFileToFTP(datasheetUrl, partId, ".pdf");
+                            //UpdateFileToFTP(imageUrl, partId, ".jpg");
+                            //UpdateFileToFTP(zoomImageUrl, partId, "_z.jpg");
+                            //UpdateFileToFTP(datasheetUrl, partId, ".pdf");
 
-                        if (productSpecList != null)
-                        {
-                            foreach (HtmlNode node in productSpecList)
+                            if (productSpecList != null)
                             {
-                                productSpecName = XmlHelpers.GetText(node, "th");
-                                productSpecContent = XmlHelpers.GetText(node, "td");
-
-                                if (!productSpecName.Contains(BAOZHUANG))
+                                foreach (HtmlNode node in productSpecList)
                                 {
-                                    if (productSpecContent.Length > productSpecContentLength)
+                                    productSpecName = XmlHelpers.GetText(node, "th");
+                                    productSpecContent = XmlHelpers.GetText(node, "td");
+
+                                    if (!productSpecName.Contains(BAOZHUANG) && !productSpecName.Contains(XIANGGUANCHANPIN))
                                     {
-                                        productSpecContent = productSpecContent.Substring(0, productSpecContentLength);
+                                        if (productSpecContent.Length > productSpecContentLength)
+                                        {
+                                            productSpecContent = productSpecContent.Substring(0, productSpecContentLength);
+                                        }
+                                        part.ProductSpecifications.Add(new ProductSpecification(productSpecName, productSpecContent));
                                     }
-                                    part.ProductSpecifications.Add(new ProductSpecification(productSpecName, productSpecContent));
                                 }
                             }
+
+                            //Todo: add price information to part after 2015-04-10
+
+                            partGroup.Parts.Add(part);
                         }
-
-                        //Todo: add price information to part after 2015-04-10
-
-                        partGroup.Parts.Add(part);
                     }
 
                     HtmlNode currentPageNode = partsHtmlDoc.DocumentNode.SelectSingleNode(currentPageXpath);
@@ -367,6 +381,30 @@ namespace GrabbingParts.BLL.ScraperLibrary
                     //Todo: add the partGroupUrl to log file
                 }
             }            
+        }
+
+        private void CheckFieldLength(ref string partId, ref string manufacturer, ref string description,
+                                      ref string packing)
+        {
+            if (partId.Length > 64)
+            {
+                partId = partId.Substring(0, 64);
+            }
+
+            if (manufacturer.Length > 64)
+            {
+                manufacturer = manufacturer.Substring(0, 64);
+            }
+
+            if (description.Length > 64)
+            {
+                description = description.Substring(0, 64);
+            }
+
+            if (packing.Length > 64)
+            {
+                packing = packing.Substring(0, 64);
+            }
         }
 
         private void UpdateFileToFTP(string targetAddress, string partId, string fileExtension)
@@ -432,9 +470,9 @@ namespace GrabbingParts.BLL.ScraperLibrary
                                                                 new XAttribute("mft", part.Manufacturer),
                                                                 new XAttribute("url", part.Url),
                                                                 new XAttribute("des", part.Description),
-                                                                new XAttribute("zoo", StringHelpers.GetLastDirectory(part.ZoomImageUrl)),
-                                                                new XAttribute("img", StringHelpers.GetLastDirectory(part.ImageUrl)),
-                                                                new XAttribute("ds", part.DatasheetUrl != "" ? (part.Id + ".pdf") : ""),
+                                                                new XAttribute("zoo", part.ZoomImageUrl),
+                                                                new XAttribute("img", part.ImageUrl),
+                                                                new XAttribute("ds", part.DatasheetUrl),
                                                                 new XAttribute("pack", part.Packing.TrimStart().TrimEnd()));
 
                             foreach (ProductSpecification ps in part.ProductSpecifications)
@@ -526,11 +564,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
 
                         foreach (XElement part in partGroup.XPathSelectElements("ps/p"))
                         {
-                            manufacturer = XmlHelpers.GetAttribute(part, "mft");
-                            if (manufacturer.Length > manufacturerLength)
-                            {
-                                manufacturer = manufacturer.Substring(0, manufacturerLength);
-                            }
+                            manufacturer = XmlHelpers.GetAttribute(part, "mft");                            
                             DataRow drProductInfo = productInfoDataTable.NewRow();
                             drProductInfo["GUID"] = (SqlGuid)System.Guid.NewGuid();
                             drProductInfo["PN"] = XmlHelpers.GetAttribute(part, "id");
@@ -562,8 +596,8 @@ namespace GrabbingParts.BLL.ScraperLibrary
                             drProductInfo["Type2"] = guid1.ToString().ToUpper();
                             drProductInfo["Type3"] = guid2.ToString().ToUpper();
                             drProductInfo["Type4"] = guid3.ToString().ToUpper();
-                            drProductInfo["Datasheets"] = XmlHelpers.GetAttribute(part, "ds");
-                            drProductInfo["Image"] = XmlHelpers.GetAttribute(part, "img");
+                            drProductInfo["Datasheets"] = (XmlHelpers.GetAttribute(part, "ds") != "" ? drProductInfo["PN"] + ".pdf" : "");
+                            drProductInfo["Image"] = (XmlHelpers.GetAttribute(part, "img") != "" ? drProductInfo["PN"] + ".jpg" : "");
                             productInfoDataTable.Rows.Add(drProductInfo);
 
                             foreach (XElement spec in part.Elements("s"))
