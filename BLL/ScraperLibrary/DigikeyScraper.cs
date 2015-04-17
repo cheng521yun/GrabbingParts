@@ -24,6 +24,7 @@ namespace GrabbingParts.BLL.ScraperLibrary
         private const int productSpecContentLength = 64;        
         private const string ftpServerAddress = "ftp://120.25.220.49/";
         private static readonly log4net.ILog log = log4net.LogManager.GetLogger("WXH");
+        private static readonly log4net.ILog log4Ftp = log4net.LogManager.GetLogger("FTP");
         private Dictionary<string, SqlGuid> manufacturerDictionary = new Dictionary<string, SqlGuid>();
         private Object obj = new Object();
         public static HtmlDocument baseHtmlDoc = new HtmlDocument();
@@ -880,17 +881,17 @@ namespace GrabbingParts.BLL.ScraperLibrary
             //For FTP files later
             if (datasheetUrl != "")
             {
-                log.InfoFormat("DS Url:{0},{1}", datasheetUrl, partId);
+                log4Ftp.InfoFormat("DS Url:{0},{1}", datasheetUrl, partId);
             }
 
             if (imageUrl != "")
             {
-                log.InfoFormat("Image Url:{0},{1}", imageUrl, partId);
+                log4Ftp.InfoFormat("Image Url:{0},{1}", imageUrl, partId);
             }
 
             if (zoomImageUrl != "")
             {
-                log.InfoFormat("Zoom Image Url:{0},{1}", zoomImageUrl, partId);
+                log4Ftp.InfoFormat("Zoom Image Url:{0},{1}", zoomImageUrl, partId);
             }
         }
 
