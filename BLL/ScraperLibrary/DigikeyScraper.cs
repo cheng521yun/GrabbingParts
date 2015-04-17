@@ -107,24 +107,24 @@ namespace GrabbingParts.BLL.ScraperLibrary
             SqlGuid guid3;
             XElement category = scrapedData.Element("cat");
 
-            guid0 = (SqlGuid)System.Guid.NewGuid();
+            guid0 = new SqlGuid(XmlHelpers.GetAttribute(category, "guid"));
             AddRow(categoryDataTables[0], category, guid0, "");
 
             foreach (XElement subCategory in category.XPathSelectElements("subcats/subcat"))
             {
-                guid1 = (SqlGuid)System.Guid.NewGuid();
+                guid1 = new SqlGuid(XmlHelpers.GetAttribute(subCategory, "guid"));
                 AddRow(categoryDataTables[1], subCategory, guid1, guid0.ToString());
 
                 foreach (XElement widget in subCategory.XPathSelectElements("wgts/wgt"))
                 {
-                    guid2 = (SqlGuid)System.Guid.NewGuid();
+                    guid2 = new SqlGuid(XmlHelpers.GetAttribute(widget, "guid"));
                     AddRow(categoryDataTables[2], widget, guid2, guid1.ToString());
 
                     foreach (XElement partGroup in widget.XPathSelectElements("pgs/pg"))
                     {
                         if (XmlHelpers.GetAttribute(partGroup, "n") != "PartGroup")
                         {
-                            guid3 = (SqlGuid)System.Guid.NewGuid();
+                            guid3 = new SqlGuid(XmlHelpers.GetAttribute(partGroup, "guid"));
                             AddRow(categoryDataTables[3], partGroup, guid3, guid2.ToString());
                         }
                     }
